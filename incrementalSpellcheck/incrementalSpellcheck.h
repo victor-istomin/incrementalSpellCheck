@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <iterator>
 #include <unordered_set>
+#include <cctype>
+#include "SpellCheck.h"
+
 
 class IncrementalSearch
 {
@@ -12,6 +15,7 @@ public:
 
     template <typename StringsArray>
     explicit IncrementalSearch(const StringsArray& text)
+        : m_spellCheck(text)
     {
         m_text.reserve(std::size(text));
         std::copy(std::begin(text), std::end(text), std::back_inserter(m_text));
@@ -20,27 +24,48 @@ public:
     Strings search(const std::string& substring, size_t maxCount = 10)
     {
         Strings results;
-        std::unordered_set<Strings::const_pointer> alreadyAdded;
+        std::unordered_set<std::string> alreadyAdded;
 
         results.reserve(maxCount);
 
-        // exact match
+        // starts with
         for (const std::string& text : m_text)
         {
             if (isStartsWith(text, substring))
             {
                 results.push_back(text);
-                alreadyAdded.insert(&text);
+                alreadyAdded.insert(text);
             }
         }
 
-        // starts with
+        // contains
         for (const std::string& text : m_text)
         {
-            if (alreadyAdded.find(&text) == alreadyAdded.end() && isContains(text, substring))
+            if (isContains(text, substring) && alreadyAdded.find(text) == alreadyAdded.end())
             {
                 results.push_back(text);
-                alreadyAdded.insert(&text);
+                alreadyAdded.insert(text);
+            }
+        }
+
+        // with corrections
+        auto corrections = getCorrections(substring);
+        unsigned minMisprints = corrections.empty() ? 0 : corrections.front().m_distance;
+
+        for (const SpellCheck::Correction& correction : corrections)
+        {
+            if (correction.m_distance != minMisprints)
+                break;   // use most attractive corrections only
+
+            const std::string& corrected = *correction.m_word;
+
+            for (const std::string& text : m_text)
+            {
+                if (isContains(text, corrected) && alreadyAdded.find(text) == alreadyAdded.end())
+                {
+                    results.push_back(text);
+                    alreadyAdded.insert(text);
+                }
             }
         }
 
@@ -50,8 +75,15 @@ public:
         return results;
     }
 
+    SpellCheck::Corrections getCorrections(const std::string& word)
+    {
+        // TODO 
+        return m_spellCheck.getCorrections(word, 5, true);
+    }
+
 private:
-    Strings m_text;
+    Strings    m_text;
+    SpellCheck m_spellCheck;
 
     bool isStartsWith(const std::string& string, const std::string& substr)
     {
@@ -65,25 +97,4 @@ private:
     }
 };
 
-class SpellCheck
-{
-public:
-    template <typename StringsArray>
-    explicit SpellCheck(const StringsArray& text)
-    {
-        Strings textVector;
-        textVector.reserve(std::size(text));
 
-        for (const std::string& sentence : textVector)
-        {
-            tokenize(sentence, std::back_inserter(m_text));
-        }
-    }
-
-private:
-    typedef std::vector<std::string> Strings;
-
-    Strings m_text;
-
-    void tokenize(const std::string& string, Strings::iterator inserterIt);
-};
