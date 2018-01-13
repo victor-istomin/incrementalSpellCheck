@@ -18,38 +18,51 @@ public:
         : m_spellCheck(text)
     {
         m_text.reserve(std::size(text));
-        std::copy(std::begin(text), std::end(text), std::back_inserter(m_text));
+        
+        std::string item;
+        for (const auto& textItem : text)
+        {
+            item = textItem;
+            m_text.push_back(item);
+
+            std::transform(item.begin(), item.end(), item.begin(), [](char c) { return tolower(c); });
+            m_textLowercase.push_back(item);
+        }
     }
 
-    Strings search(const std::string& substring, size_t maxCount = 10)
+    Strings search(std::string substring, size_t maxCount = 10)
     {
         Strings results;
         std::unordered_set<std::string> alreadyAdded;
 
+        std::transform(substring.begin(), substring.end(), substring.begin(), [](char c) { return tolower(c); });
+
         results.reserve(maxCount);
 
         // starts with
-        for (const std::string& text : m_text)
+        for (size_t i = 0; i < m_textLowercase.size(); ++i)
         {
-            if (isStartsWith(text, substring))
+            const std::string& lowercaseItem = m_textLowercase[i];
+            if (isStartsWith(lowercaseItem, substring))
             {
-                results.push_back(text);
-                alreadyAdded.insert(text);
+                results.push_back(m_text[i]);
+                alreadyAdded.insert(lowercaseItem);
             }
         }
 
         // contains
-        for (const std::string& text : m_text)
+        for (size_t i = 0; i < m_textLowercase.size(); ++i)
         {
-            if (isContains(text, substring) && alreadyAdded.find(text) == alreadyAdded.end())
+            const std::string& lowercaseItem = m_textLowercase[i];
+            if (isContains(lowercaseItem, substring) && alreadyAdded.find(lowercaseItem) == alreadyAdded.end())
             {
-                results.push_back(text);
-                alreadyAdded.insert(text);
+                results.push_back(m_text[i]);
+                alreadyAdded.insert(lowercaseItem);
             }
         }
 
         // with corrections
-        auto corrections = getCorrections(substring);
+        auto     corrections  = getCorrections(substring);
         unsigned minMisprints = corrections.empty() ? 0 : corrections.front().m_distance;
 
         for (const SpellCheck::Correction& correction : corrections)
@@ -59,12 +72,13 @@ public:
 
             const std::string& corrected = *correction.m_word;
 
-            for (const std::string& text : m_text)
+            for (size_t i = 0; i < m_textLowercase.size(); ++i)
             {
-                if (isContains(text, corrected) && alreadyAdded.find(text) == alreadyAdded.end())
+                const std::string& lowercaseItem = m_textLowercase[i];
+                if (isContains(lowercaseItem, corrected) && alreadyAdded.find(lowercaseItem) == alreadyAdded.end())
                 {
-                    results.push_back(text);
-                    alreadyAdded.insert(text);
+                    results.push_back(m_text[i]);
+                    alreadyAdded.insert(lowercaseItem);
                 }
             }
         }
@@ -83,6 +97,7 @@ public:
 
 private:
     Strings    m_text;
+    Strings    m_textLowercase;
     SpellCheck m_spellCheck;
 
     bool isStartsWith(const std::string& string, const std::string& substr)

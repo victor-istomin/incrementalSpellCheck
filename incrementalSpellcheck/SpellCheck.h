@@ -77,10 +77,10 @@ private:
 
         for (size_t i = 0; i < input.size(); ++i)
         {
-            char nextChar = input[i];
-            if (isalpha(nextChar))
+            int nextChar = input[i];
+            if (isalnum(nextChar))
             {
-                nextToken += nextChar;
+                nextToken += tolower(nextChar);
             }
             else if (!nextToken.empty())
             {

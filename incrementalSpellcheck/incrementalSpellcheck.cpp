@@ -7,33 +7,31 @@
 
 #include <conio.h>
 #include <iostream>
-
-const char* textCorpus[] = 
-{
-	"list test",
-    "first, item",
-    "second item!",
-    "third &string",
-    "fourth...element",
-    "...fifth",
-    "sixth,item,in,list",
-    "seventh string",
-	"one more string",
-	"and one more item"
-};
+#include <fstream>
 
 int main()
 {
+    std::ifstream articles = std::ifstream("wikipedia.txt");
+    std::vector<std::string> wikipedia;
+    wikipedia.reserve(10000);
+    while (articles)
+    {
+        std::string line;
+        std::getline(articles, line);
+
+        if (!line.empty())
+            wikipedia.emplace_back(std::move(line));
+    }
+
 	static const char ESC       = 0x1b;
 	static const char CTRL_C    = 0x03;
     static const char BACKSPACE = 0x08;
 
-    IncrementalSearch search { textCorpus };
+    IncrementalSearch search { wikipedia };
+
+    std::cout << "Loaded" << std::endl;
 
     std::string substring;
-
-	for(const auto& next : textCorpus)
-		std::cout << "   " << next << std::endl;
 
     int key = 0;
     while ((key = _getch()) != ESC && key != CTRL_C)
@@ -41,7 +39,7 @@ int main()
         switch (key)
         {
         case BACKSPACE:
-            substring.resize(std::max((size_t)0, substring.length() - 1));
+            substring.resize(std::max(0, static_cast<int>(substring.length()) - 1));
             break;
 
         default:
