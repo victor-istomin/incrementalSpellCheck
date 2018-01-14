@@ -9,6 +9,8 @@
 #include <iostream>
 #include <fstream>
 
+#include <ctime>
+
 int main()
 {
     std::ifstream articles = std::ifstream("wikipedia.txt");
@@ -51,13 +53,22 @@ int main()
                   << " ============== " << std::endl 
                   << "Search: '" << substring << "'..." << std::endl;
 
-        for (const std::string& result : search.search(substring))
+        clock_t start = clock();
+        auto results = search.search(substring);
+//         for (int i = 0; i < 300; ++i)
+//         {
+//             auto results = search.search(substring);
+//         }
+        clock_t elapsedTime = clock() - start;
+
+        for (const std::string& result : results)
             std::cout << " > " << result << std::endl;
 
 		std::cout << "Corrections: { ";
+
         for (const SpellCheck::Correction& correction : search.getCorrections(substring))
             std::cout << correction.m_distance << ": " << *correction.m_word << "; ";
-        std::cout << " }" << std::endl;
+        std::cout << "} (" << elapsedTime << " clocks) " << std::endl;
     }
 
     return 0;

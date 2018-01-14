@@ -32,56 +32,51 @@ public:
 
     Strings search(std::string substring, size_t maxCount = 10)
     {
-        Strings results;
-        std::unordered_set<std::string> alreadyAdded;
+        Strings resultsStart;
+        Strings resultsContain;
+        Strings resultsCorrected;
 
         std::transform(substring.begin(), substring.end(), substring.begin(), [](char c) { return tolower(c); });
 
-        results.reserve(maxCount);
+        resultsStart.reserve(maxCount);
+        resultsContain.reserve(maxCount);
+        resultsCorrected.reserve(maxCount);
 
-        // starts with
-        for (size_t i = 0; i < m_textLowercase.size(); ++i)
-        {
-            const std::string& lowercaseItem = m_textLowercase[i];
-            if (isStartsWith(lowercaseItem, substring))
-            {
-                results.push_back(m_text[i]);
-                alreadyAdded.insert(lowercaseItem);
-            }
-        }
-
-        // contains
-        for (size_t i = 0; i < m_textLowercase.size(); ++i)
-        {
-            const std::string& lowercaseItem = m_textLowercase[i];
-            if (isContains(lowercaseItem, substring) && alreadyAdded.find(lowercaseItem) == alreadyAdded.end())
-            {
-                results.push_back(m_text[i]);
-                alreadyAdded.insert(lowercaseItem);
-            }
-        }
-
-        // with corrections
         auto     corrections  = getCorrections(substring);
         unsigned minMisprints = corrections.empty() ? 0 : corrections.front().m_distance;
+        auto worstCorrections = std::find_if(corrections.begin(), corrections.end(), [minMisprints](const SpellCheck::Correction& c) { return c.m_distance > minMisprints; });
+        corrections.resize(std::distance(corrections.begin(), worstCorrections));
 
-        for (const SpellCheck::Correction& correction : corrections)
+        for (size_t i = 0; i < m_textLowercase.size() && resultsStart.size() < maxCount; ++i)
         {
-            if (correction.m_distance != minMisprints)
-                break;   // use most attractive corrections only
-
-            const std::string& corrected = *correction.m_word;
-
-            for (size_t i = 0; i < m_textLowercase.size(); ++i)
+            const std::string& lowercaseText = m_textLowercase[i];
+            if (isStartsWith(lowercaseText, substring))
             {
-                const std::string& lowercaseItem = m_textLowercase[i];
-                if (isContains(lowercaseItem, corrected) && alreadyAdded.find(lowercaseItem) == alreadyAdded.end())
+                resultsStart.push_back(m_text[i]);
+            }
+            else if (resultsContain.size() < maxCount && isContains(lowercaseText, substring))
+            {
+                resultsContain.push_back(m_text[i]);
+            }
+            else if (resultsContain.size() < maxCount && resultsCorrected.size() < maxCount)
+            {
+                for (const SpellCheck::Correction& correction : corrections)
                 {
-                    results.push_back(m_text[i]);
-                    alreadyAdded.insert(lowercaseItem);
+                    const std::string& corrected = *correction.m_word;
+                    if (isContains(lowercaseText, corrected))
+                    {
+                        resultsCorrected.push_back(m_text[i]);
+                        break;
+                    }
                 }
             }
         }
+
+        Strings results;
+        results.reserve(resultsStart.size() + resultsContain.size() + resultsCorrected.size());
+        std::copy(resultsStart.begin(), resultsStart.end(), std::back_inserter(results));
+        std::copy(resultsContain.begin(), resultsContain.end(), std::back_inserter(results));
+        std::copy(resultsCorrected.begin(), resultsCorrected.end(), std::back_inserter(results));
 
         if (results.size() > maxCount)
             results.resize(maxCount);

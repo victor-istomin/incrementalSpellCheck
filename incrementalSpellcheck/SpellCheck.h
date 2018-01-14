@@ -1,7 +1,9 @@
 #pragma once
 #include <algorithm>
+#include <numeric>
 #include <string>
 #include <list>
+#include <array>
 
 class SpellCheck
 {
@@ -44,11 +46,11 @@ public:
                 if(incrementalWord.size() > word.size())
                     incrementalWord.resize(word.size());
 
-                distance = levenshteinDistance(incrementalWord, word);
+                distance = damerauLevenshteinDistance(incrementalWord, word);
             }
             else
             {
-                distance = levenshteinDistance(correctWord, word);
+                distance = damerauLevenshteinDistance(correctWord, word);
             }
 
             if (corrections.size() < maxCount || corrections.back().m_distance > distance)
@@ -66,6 +68,14 @@ public:
     }
 
 private:
+    enum COST
+    {
+        DELETION = 1,
+        INSERTION = 1,
+        SUBSTITUTION = 1,
+        TRANSPOSITION = 1,
+    };
+
     typedef std::vector<std::string> Strings;
 
     Strings m_tokens;
@@ -96,44 +106,62 @@ private:
         }
     }
 
-    unsigned levenshteinDistance(const std::string& source, const std::string& target)
+    class Buffer
     {
-        // actually, Damerau–Levenshtein distance
-        // TODO: faster algorithm https://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Levenshtein_distance#C++
+        static const size_t STATIC_SIZE = 16 * 16;
 
+        std::array<unsigned, STATIC_SIZE> m_static;
+        std::vector<unsigned>             m_dynamic;
+        unsigned*                         m_actual;
+
+        Buffer(const Buffer&)            = delete;
+        Buffer(const Buffer&&)           = delete;
+        Buffer& operator=(const Buffer&) = delete;
+
+    public:
+        explicit Buffer(size_t size)
+            : m_static()
+            , m_dynamic()
+            , m_actual(m_static.data())
+        {
+            if (size > STATIC_SIZE)
+            {
+                m_dynamic.resize(size);
+                m_actual = m_dynamic.data();
+            }
+        }
+
+        unsigned&       operator[](size_t index)       { return m_actual[index]; }
+        const unsigned& operator[](size_t index) const { return m_actual[index]; }
+    };
+
+    unsigned damerauLevenshteinDistance(const std::string& source, const std::string& target)
+    {
         size_t width  = source.length() + 1;
         size_t height = target.length() + 1;
 
-        enum COST
-        {
-            DELETION = 1,
-            INSERTION = 1,
-            SUBSTITUTION = 1,
-            TRANSPOSITION = 1,
-        };
-
-        std::vector<unsigned> distanceMatrix(width * height, 0);
-        for (unsigned int i = 1; i < width; ++i)
-            distanceMatrix[i] = i;
-
-        for (unsigned int j = 1; j < height; ++j)
-            distanceMatrix[width * j] = j;
+        Buffer distanceMatrix(width * height);
+        std::iota(&distanceMatrix[0], &distanceMatrix[width], 0);  // 0,1,2,...,width
 
         for (size_t i = 1, im = 0; i < height; ++i, ++im)
         {
+            distanceMatrix[i * width] = i;
             for (size_t j = 1, jn = 0; j < width; ++j, ++jn)
             {
+                size_t thisRow = i * width;
+                size_t prevRow = (i - 1) * width;
+
                 if (source[jn] == target[im])
                 {
-                    distanceMatrix[(i * width) + j] = distanceMatrix[((i - 1) * width) + (j - 1)];
+                    distanceMatrix[thisRow + j] = distanceMatrix[prevRow + (j - 1)];
                 }
                 else
                 {
                     unsigned nextCost = std::min(
                     {
-                        distanceMatrix[(i - 1) * width + j]       + DELETION,    // a deletion
-                        distanceMatrix[i * width + (j - 1)]       + INSERTION,   // an insertion
-                        distanceMatrix[(i - 1) * width + (j - 1)] + SUBSTITUTION // a substitution
+                        distanceMatrix[prevRow + (j - 1)] + SUBSTITUTION, // a substitution
+                        distanceMatrix[prevRow + j]       + DELETION,     // a deletion
+                        distanceMatrix[thisRow + (j - 1)] + INSERTION     // an insertion
                     });
 
                     // a transposition
@@ -142,7 +170,7 @@ private:
                         nextCost = std::min(nextCost, distanceMatrix[((i - 2) * width) + (j - 2)] + TRANSPOSITION);
                     }
 
-                    distanceMatrix[(i * width) + j] = nextCost;
+                    distanceMatrix[thisRow + j] = nextCost;
                 }
             }
         }
