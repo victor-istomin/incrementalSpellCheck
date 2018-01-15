@@ -36,20 +36,31 @@ public:
     {
         Corrections corrections;
 
-        std::string incrementalWord;
-        
         for (const auto& correctWord : m_tokens)
         {
             unsigned distance = 0;
-            if (isIncremental)
+            static const size_t k_minLengthForIncrSearch = 3;
+            if (isIncremental && word.length() >= k_minLengthForIncrSearch)
             {
-                // ignore insertions past the end of word, assume user will type them later
-                // BUG: not the best solution, may lead to unexpected results, e.g. distance("urainians", "ukrainians") = 2
-                incrementalWord = correctWord;
-                if(incrementalWord.size() > word.size())
-                    incrementalWord.resize(word.size());
+                distance = damerauLevenshteinDistance(correctWord, word);
 
-                distance = damerauLevenshteinDistance(incrementalWord, word);
+                // ignore insertions past the end of word, assume user will type them later. To achieve this, 
+                // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
+                unsigned insufficientChars = correctWord.length() > word.length() ? correctWord.length() - word.length() : 0;
+                if (distance > 0 && insufficientChars > 0 && insufficientChars <= distance)
+                {
+                    char wordEnding[k_minLengthForIncrSearch + 1];
+                    int wordEndingPos = word.length() - k_minLengthForIncrSearch;
+                    std::copy_n(word.c_str() + wordEndingPos, k_minLengthForIncrSearch + 1, wordEnding);
+
+                    static const int k_endingPosThreshold = 1;
+                    int endingPosDifference = std::abs(wordEndingPos - (int)correctWord.find(wordEnding));
+                    if (endingPosDifference <= k_endingPosThreshold)
+                    {
+                        distance -= insufficientChars;
+                        distance += endingPosDifference;
+                    }
+                }
             }
             else
             {
