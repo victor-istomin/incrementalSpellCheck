@@ -33,7 +33,6 @@ int main()
     int key = 0;
     while ((key = getch()) != ESC && key != CTRL_C)
     {
-        std::cout << "debug: " << (int)key << ";" << std::endl;
         switch (key)
         {
         case LINUX_DEL:
@@ -53,10 +52,14 @@ int main()
 
         clock_t start = clock();
         auto results = search.search(substring);
-//         for (int i = 0; i < 300; ++i)
-//         {
-//             auto results = search.search(substring);
-//         }
+
+#ifdef WANT_PROFILING
+        for (int i = 0; i < 300; ++i)
+        {
+            auto results = search.search(substring);
+        }
+#endif
+
         clock_t elapsedTime = clock() - start;
 
         for (const std::string& result : results)
