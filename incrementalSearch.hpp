@@ -87,9 +87,11 @@ public:
 
     SpellCheck::Corrections getCorrections(const std::string& word)
     {
-        // TODO
-        return m_spellCheck.getCorrections(word, 5, true);
+        static const unsigned MAX_COUNT = 5;
+        return m_spellCheck.getCorrections(word, MAX_COUNT, true);
     }
+
+    const SpellCheck& getSpellCheck() const { return m_spellCheck; }
 
 private:
     Strings    m_text;

@@ -32,7 +32,7 @@ public:
 
     typedef std::list<Correction> Corrections;
 
-    Corrections getCorrections(const std::string& word, unsigned maxCount, bool isIncremental = false)
+    Corrections getCorrections(const std::string& word, unsigned maxCount, bool isIncremental = false) const
     {
         Corrections corrections;
 
@@ -137,7 +137,7 @@ private:
         const unsigned& operator[](size_t index) const { return m_actual[index]; }
     };
 
-    unsigned damerauLevenshteinDistance(const std::string& source, const std::string& target)
+    unsigned damerauLevenshteinDistance(const std::string& source, const std::string& target) const
     {
         size_t width  = source.length() + 1;
         size_t height = target.length() + 1;
