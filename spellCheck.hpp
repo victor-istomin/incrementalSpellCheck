@@ -44,6 +44,7 @@ public:
             if (isIncremental)
             {
                 // ignore insertions past the end of word, assume user will type them later
+                // BUG: not the best solution, may lead to unexpected results, e.g. distance("urainians", "ukrainians") = 2
                 incrementalWord = correctWord;
                 if(incrementalWord.size() > word.size())
                     incrementalWord.resize(word.size());
