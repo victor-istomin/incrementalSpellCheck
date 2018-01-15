@@ -1,6 +1,6 @@
 ## Incremental search and spellchecker in C++
 
-This is C++ header-only implementation in incremental search withing a list of captions (menu, articles, etc) with misprint corrections support. 
+This is C++ header-only implementation of incremental search within a list of captions (menu, articles, etc) with misprint corrections support. 
 
 ## Contents
 
