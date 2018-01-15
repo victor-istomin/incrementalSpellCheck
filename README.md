@@ -4,8 +4,8 @@ This is C++ header-only implementation of incremental search within a list of ca
 
 ## Contents
 
- * [incrementalSearch.h](incrementalSearch.h) - search implementation
- * [spellCheck.h](spellCheck.h) - spelling checker using [Damerau–Levenshtein distance](https://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance)
+ * [incrementalSearch.hpp](incrementalSearch.hpp) - search implementation
+ * [spellCheck.hpp](spellCheck.hpp) - spelling checker using [Damerau–Levenshtein distance](https://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance)
  * [test.cpp](test.cpp) - a kind of tests and usage example.
  * [msvc-test](msvc-test) - test solution for MSVC 2015 and higher
  * [linux-test](linux-test) - Linux Makefile
