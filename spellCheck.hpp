@@ -1,9 +1,11 @@
 #pragma once
 #include <algorithm>
+#include <iterator>
 #include <numeric>
 #include <string>
 #include <list>
 #include <array>
+#include <cstring>
 
 class SpellCheck
 {
@@ -145,7 +147,7 @@ private:
 
         for (size_t i = 1, im = 0; i < height; ++i, ++im)
         {
-            distanceMatrix[i * width] = i;
+            distanceMatrix[i * width] = (unsigned)i;
             for (size_t j = 1, jn = 0; j < width; ++j, ++jn)
             {
                 size_t thisRow = i * width;

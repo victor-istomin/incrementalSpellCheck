@@ -5,7 +5,8 @@
 #include <iterator>
 #include <unordered_set>
 #include <cctype>
-#include "SpellCheck.h"
+
+#include "spellCheck.hpp"
 
 
 class IncrementalSearch
@@ -18,7 +19,7 @@ public:
         : m_spellCheck(text)
     {
         m_text.reserve(std::size(text));
-        
+
         std::string item;
         for (const auto& textItem : text)
         {
@@ -86,7 +87,7 @@ public:
 
     SpellCheck::Corrections getCorrections(const std::string& word)
     {
-        // TODO 
+        // TODO
         return m_spellCheck.getCorrections(word, 5, true);
     }
 
