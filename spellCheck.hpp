@@ -10,6 +10,10 @@
 class SpellCheck
 {
 public:
+    // with no vocabulary, for distance computation only
+    SpellCheck() {}
+
+    // with vocabulary
     template <typename StringsArray>
     explicit SpellCheck(const StringsArray& text)
     {
