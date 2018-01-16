@@ -130,6 +130,9 @@ void unitTests(const SpellCheck& spellChecker)
 
     SpellCheck other;
     assert(other.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
+
+    const char* rawArray[] = { "one two", "Three" };
+    SpellCheck fromRawArray { rawArray };
 }
 
 
