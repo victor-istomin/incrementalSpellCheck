@@ -4,6 +4,9 @@
 #include <iostream>
 #include <fstream>
 #include <ctime>
+#include <cassert>
+
+void unitTests(const SpellCheck& spellChecker);
 
 int main()
 {
@@ -25,6 +28,7 @@ int main()
     static const char LINUX_DEL = 0x7F;
 
     IncrementalSearch search { wikipedia };
+    unitTests(search.getSpellCheck());
 
     std::cout << "Loaded" << std::endl;
 
@@ -74,5 +78,54 @@ int main()
     }
 
     return 0;
+}
+
+void unitTests(const SpellCheck& spellChecker)
+{
+    // insertion
+    assert(spellChecker.getSmartDistance("abc", "abc") == 0);
+    assert(spellChecker.getSmartDistance("abc", "ab") == 1);
+    assert(spellChecker.getSmartDistance("abc", "ac") == 1);
+    assert(spellChecker.getSmartDistance("abc", "b") == 2);
+    assert(spellChecker.getSmartDistance("abc", "") == 3);
+
+    // deletion
+    assert(spellChecker.getSmartDistance("bc", "abc") == 1);
+    assert(spellChecker.getSmartDistance("ac", "abc") == 1);
+    assert(spellChecker.getSmartDistance("b", "abc") == 2);
+    assert(spellChecker.getSmartDistance("", "abc") == 3);
+    assert(spellChecker.getSmartDistance("", "") == 0);
+
+    // substitution
+    assert(spellChecker.getSmartDistance("abc", "abx") == 1);
+    assert(spellChecker.getSmartDistance("abc", "axx") == 2);
+    assert(spellChecker.getSmartDistance("abc", "xxx") == 3);
+
+    // transposition
+    assert(spellChecker.getSmartDistance("abc", "acb") == 1);
+    assert(spellChecker.getSmartDistance("abc", "bac") == 1);
+    assert(spellChecker.getSmartDistance("abc", "cba") == 2);
+
+    // special case: Optimal string alignment distance
+    assert(spellChecker.getSmartDistance("ca", "abc") == 3);
+    assert(spellChecker.getSmartDistance("abc", "ca") == 3);
+
+    // incremental spell check
+    assert(spellChecker.getSmartDistance("abcd",  "ab",  true) == 2);      // too short for meaningful incremental search
+    assert(spellChecker.getSmartDistance("abcde", "xbc", true) == 3);      // too short common ending for meaningful incremental search
+
+    assert(spellChecker.getSmartDistance("abcd",  "abc", true) == 0);      // 'abc.*' matches 'abcd'
+    assert(spellChecker.getSmartDistance("abcde", "abc", true) == 0);      // 'abc.*' matches 'abcde'
+    assert(spellChecker.getSmartDistance("abcde", "xbcd", true)  == 1);    // 1 correction xbcd -> abcd, then 'abc.*' matches 'abcde'
+    assert(spellChecker.getSmartDistance("abcdefg", "axcde", true) == 1);  // axcde -> abcde, then incremental
+    assert(spellChecker.getSmartDistance("abcdefg", "bcd", true) == 1);
+    assert(spellChecker.getSmartDistance("abcdefg", "acde", true) == 1);   // acde -> abcde, then incremental 
+
+    assert(spellChecker.getSmartDistance("abcdefg", "cde", true) == 4);    // common substring 'cde' located at too different word positions
+
+    assert(spellChecker.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
+    
+    // bug: have no idea about efficient solving right now
+    // assert(spellChecker.getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
 }
 

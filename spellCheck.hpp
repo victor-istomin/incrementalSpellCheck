@@ -32,53 +32,69 @@ public:
 
     typedef std::list<Correction> Corrections;
 
-    Corrections getCorrections(const std::string& word, unsigned maxCount, bool isIncremental = false) const
+    // Get a list if correction suggestions. In case of 'isIncremental', don't count insertions past the end if 'initialWord', 
+    // assume that user will type insufficient chars later
+    Corrections getCorrections(const std::string& initialWord, unsigned maxCorrections, bool isIncremental = false) const
     {
         Corrections corrections;
 
         for (const auto& correctWord : m_tokens)
         {
-            unsigned distance = 0;
-            static const size_t k_minLengthForIncrSearch = 3;
-            if (isIncremental && word.length() >= k_minLengthForIncrSearch)
-            {
-                distance = damerauLevenshteinDistance(correctWord, word);
+            unsigned distance = getSmartDistance(correctWord, initialWord, isIncremental);
 
-                // ignore insertions past the end of word, assume user will type them later. To achieve this, 
-                // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
-                unsigned insufficientChars = correctWord.length() > word.length() ? correctWord.length() - word.length() : 0;
-                if (distance > 0 && insufficientChars > 0 && insufficientChars <= distance)
-                {
-                    char wordEnding[k_minLengthForIncrSearch + 1];
-                    int wordEndingPos = word.length() - k_minLengthForIncrSearch;
-                    std::copy_n(word.c_str() + wordEndingPos, k_minLengthForIncrSearch + 1, wordEnding);
-
-                    static const int k_endingPosThreshold = 1;
-                    int endingPosDifference = std::abs(wordEndingPos - (int)correctWord.find(wordEnding));
-                    if (endingPosDifference <= k_endingPosThreshold)
-                    {
-                        distance -= insufficientChars;
-                        distance += endingPosDifference;
-                    }
-                }
-            }
-            else
-            {
-                distance = damerauLevenshteinDistance(correctWord, word);
-            }
-
-            if (corrections.size() < maxCount || corrections.back().m_distance > distance)
+            if (corrections.size() < maxCorrections || corrections.back().m_distance > distance)
             {
                 // insert item, keep correction sorted
                 auto position = std::find_if(corrections.begin(), corrections.end(), [distance](const Correction& c) { return c.m_distance > distance; });
                 corrections.insert(position, Correction { distance, &correctWord });
 
-                if(corrections.size() > maxCount)
-                    corrections.resize(maxCount);
+                if(corrections.size() > maxCorrections)
+                    corrections.resize(maxCorrections);
             }
         }
 
         return corrections;
+    }
+
+    // Get either Optimal String Alignment distance or its 'incremental' version. 
+    // Note that parameters order is important in incremental version, 
+    // because it's asymmetric ('abc.*' matches 'abcd', but 'abcd.*' does not match 'abc')
+    //
+    // Bug: deletions will lead to extra cost in incremental distance: 
+    //      getSmartDistance("abcdefg", "xabc",  true) == 3 instead of 1
+    //
+    // See getCorrections() for incremental explanations or optimalStringAlignementDistance() for OSA distance details
+    unsigned getSmartDistance(const std::string& correctWord, const std::string& initialWord, bool isIncremental = false) const
+    {
+        unsigned distance = optimalStringAlignementDistance(correctWord, initialWord);
+
+        static const size_t k_minIncrSearchLen = 3;
+        if (isIncremental && initialWord.length() >= k_minIncrSearchLen)
+        {
+            // ignore insertions past the end of word, assume user will type them later. To achieve this, 
+            // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
+
+            unsigned insufficientChars = correctWord.length() > initialWord.length() ? correctWord.length() - initialWord.length() : 0;
+            if (insufficientChars > 0 && distance >= insufficientChars)
+            {
+                char wordEnding[k_minIncrSearchLen + 1];
+                int wordEndingPos = initialWord.length() - k_minIncrSearchLen;
+                std::copy_n(initialWord.c_str() + wordEndingPos, k_minIncrSearchLen + 1, wordEnding);
+
+                static const int k_endingDiffThreshold = 1;
+                size_t offset = (size_t) std::max(0, wordEndingPos - k_endingDiffThreshold);
+                auto posInCorrectWord = correctWord.find(wordEnding, offset);
+                int endingPosDifference = std::abs(wordEndingPos - (int)posInCorrectWord);
+
+                if (posInCorrectWord != std::string::npos && endingPosDifference <= k_endingDiffThreshold)
+                {
+                    distance -= insufficientChars;
+                    distance += endingPosDifference;
+                }
+            }
+        }
+
+        return distance;
     }
 
 private:
@@ -149,8 +165,12 @@ private:
         const unsigned& operator[](size_t index) const { return m_actual[index]; }
     };
 
-    unsigned damerauLevenshteinDistance(const std::string& source, const std::string& target) const
+    unsigned optimalStringAlignementDistance(const std::string& source, const std::string& target) const
     {
+        // it's a variation of Damerau-Levenshtein distance with small improvement:
+        // https://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance#Algorithm
+        // LD_distance("CA", "ABC") == 2, while OSA_distance("CA", "ABC") == 3;
+
         size_t width  = source.length() + 1;
         size_t height = target.length() + 1;
 
