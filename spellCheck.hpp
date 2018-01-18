@@ -92,8 +92,8 @@ public:
 
                 if (posInCorrectWord != std::string::npos && endingPosDifference <= k_endingDiffThreshold)
                 {
+                    insufficientChars = correctWord.length() - posInCorrectWord - std::size(wordEnding) + 1;
                     distance -= insufficientChars;
-                    distance += endingPosDifference;
                 }
             }
         }
