@@ -1,4 +1,4 @@
-## Incremental search and spellchecker in C++
+## Incremental search and spell checker in C++
 
 This is C++ header-only implementation of incremental search within a list of captions (menu, articles, etc) with misprint corrections support. 
 
