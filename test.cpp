@@ -5,10 +5,59 @@
 #include <fstream>
 #include <ctime>
 #include <cassert>
+#include <map>
 
-void unitTests(const SpellCheck& spellChecker);
+void unitTests();
+void interactive();
+void help();
 
-int main()
+static const std::string s_interactive = "-i";
+static const std::string s_unitTests   = "-u";
+static const std::string s_help        = "-h";
+
+typedef void (*Callback)();
+typedef std::pair<Callback, const char*> CallbackInfo;
+typedef std::map<std::string, CallbackInfo> Handlers;
+
+static Handlers s_handlers =
+{
+    {s_unitTests,   {unitTests,   "unit test"}},
+    {s_interactive, {interactive, "interactive"}},
+    {s_help,        {help,        "help"}},
+};
+
+void help()
+{
+    std::cout << "Available options: " << std::endl;
+    for(const auto& optionHandlerPair : s_handlers)
+        std::cout << "  " << optionHandlerPair.first << "\t  : " << optionHandlerPair.second.second << std::endl;
+}
+
+int main(int argc, char *argv[])
+{
+    std::vector<std::string> params;
+    for(int i = 1; i < argc; ++i)
+        params.push_back(argv[i]);
+
+    if (params.empty())
+        params.push_back(s_help);
+
+    for(const std::string& mode : params)
+    {
+        Callback handler = s_handlers[mode].first;
+        if (handler == nullptr)
+        {
+            help();
+            return 1;
+        }
+
+        handler();
+    }
+
+    return 0;
+}
+
+IncrementalSearch load()
 {
     std::ifstream articles = std::ifstream("../wikipedia.txt");
     std::vector<std::string> wikipedia;
@@ -22,13 +71,17 @@ int main()
             wikipedia.emplace_back(std::move(line));
     }
 
+    return IncrementalSearch { wikipedia };
+}
+
+void interactive()
+{
     static const char ESC       = 0x1b;
     static const char CTRL_C    = 0x03;
     static const char BACKSPACE = 0x08;
     static const char LINUX_DEL = 0x7F;
 
-    IncrementalSearch search { wikipedia };
-    unitTests(search.getSpellCheck());
+    IncrementalSearch search = load();
 
     std::cout << "Loaded" << std::endl;
 
@@ -51,7 +104,7 @@ int main()
         }
 
         std::cout << std::endl
-                  << " ============== " << std::endl 
+                  << " ============== " << std::endl
                   << "Search: '" << substring << "'..." << std::endl;
 
         clock_t start = clock();
@@ -76,12 +129,13 @@ int main()
 
         std::cout << "} (" << elapsedTime << " clocks) " << std::endl;
     }
-
-    return 0;
 }
 
-void unitTests(const SpellCheck& spellChecker)
+void unitTests()
 {
+    IncrementalSearch search = load();
+    const SpellCheck& spellChecker = search.getSpellCheck();
+
     // insertion
     assert(spellChecker.getSmartDistance("abc", "abc") == 0);
     assert(spellChecker.getSmartDistance("abc", "ab") == 1);
@@ -119,12 +173,12 @@ void unitTests(const SpellCheck& spellChecker)
     assert(spellChecker.getSmartDistance("abcde", "xbcd", true)  == 1);    // 1 correction xbcd -> abcd, then 'abc.*' matches 'abcde'
     assert(spellChecker.getSmartDistance("abcdefg", "axcde", true) == 1);  // axcde -> abcde, then incremental
     assert(spellChecker.getSmartDistance("abcdefg", "bcd", true) == 1);
-    assert(spellChecker.getSmartDistance("abcdefg", "acde", true) == 1);   // acde -> abcde, then incremental 
+    assert(spellChecker.getSmartDistance("abcdefg", "acde", true) == 1);   // acde -> abcde, then incremental
 
     assert(spellChecker.getSmartDistance("abcdefg", "cde", true) == 4);    // common substring 'cde' located at too different word positions
 
     assert(spellChecker.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
-    
+
     assert(spellChecker.getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
 
     SpellCheck other;
@@ -132,6 +186,8 @@ void unitTests(const SpellCheck& spellChecker)
 
     const char* rawArray[] = { "one two", "Three" };
     SpellCheck fromRawArray { rawArray };
+
+    std::cout << "unit tests: OK" << std::endl;
 }
 
 

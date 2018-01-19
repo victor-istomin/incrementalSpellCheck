@@ -98,6 +98,9 @@ private:
     Strings    m_textLowercase;
     SpellCheck m_spellCheck;
 
+    IncrementalSearch(const IncrementalSearch&)            = delete;
+    IncrementalSearch& operator=(const IncrementalSearch&) = delete;
+
     bool isStartsWith(const std::string& string, const std::string& substr)
     {
         return string.length() >= substr.length() 
