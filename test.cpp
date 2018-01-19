@@ -11,9 +11,7 @@ void unitTests();
 void interactive();
 void help();
 
-static const std::string s_interactive = "-i";
-static const std::string s_unitTests   = "-u";
-static const std::string s_help        = "-h";
+static const std::string s_help = "-h";
 
 typedef void (*Callback)();
 typedef std::pair<Callback, const char*> CallbackInfo;
@@ -21,9 +19,10 @@ typedef std::map<std::string, CallbackInfo> Handlers;
 
 static Handlers s_handlers =
 {
-    {s_unitTests,   {unitTests,   "unit test"}},
-    {s_interactive, {interactive, "interactive"}},
-    {s_help,        {help,        "help"}},
+    {"-u",   {unitTests,   "unit test"}},
+    {"-i",   {interactive, "interactive"}},
+    {s_help, {help,        "help"}},
+
 };
 
 void help()
@@ -71,7 +70,7 @@ IncrementalSearch load()
             wikipedia.emplace_back(std::move(line));
     }
 
-    return IncrementalSearch { wikipedia };
+    return std::move(IncrementalSearch { wikipedia });
 }
 
 void interactive()

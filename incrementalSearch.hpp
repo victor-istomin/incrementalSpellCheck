@@ -93,6 +93,12 @@ public:
 
     const SpellCheck& getSpellCheck() const { return m_spellCheck; }
 
+    IncrementalSearch(IncrementalSearch&& right)
+        : m_text(std::move(right.m_text))
+        , m_textLowercase(std::move(right.m_textLowercase))
+        , m_spellCheck(std::move(right.m_spellCheck))
+    {}
+
 private:
     Strings    m_text;
     Strings    m_textLowercase;
