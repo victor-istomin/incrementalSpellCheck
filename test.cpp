@@ -10,6 +10,7 @@
 void unitTests();
 void interactive();
 void help();
+void profileOsa();
 
 static const std::string s_help = "-h";
 
@@ -19,10 +20,10 @@ typedef std::map<std::string, CallbackInfo> Handlers;
 
 static Handlers s_handlers =
 {
-    {"-u",   {unitTests,   "unit test"}},
-    {"-i",   {interactive, "interactive"}},
-    {s_help, {help,        "help"}},
-
+    {"-u",     {unitTests,   "unit test"}},
+    {"-i",     {interactive, "interactive"}},
+    {s_help,   {help,        "help"}},
+    {"-p_osa", {profileOsa,  "profile Optimal String Alignment code"}},
 };
 
 void help()
@@ -189,4 +190,44 @@ void unitTests()
     std::cout << "unit tests: OK" << std::endl;
 }
 
+
+void profileOsa()
+{
+    int doNotOptimize = 0;
+    SpellCheck spellCheck;
+
+    static const std::string words[] =
+    {
+        "abcdefghig",         "1_abcdefghig",         "2_abcdefghig",         "3_abcdefghig",         "4_defghig",
+        "bace",               "1_bace",               "2_bace",               "3_bace",               "4_e",
+        "abace",              "1_abace",              "2_abace",              "3_abace",              "4_ce",
+        "qwertyui",           "1_qwertyui",           "2_qwertyui",           "3_qwertyui",           "4_rtyui",
+        "zxcvbnm",            "1_zxcvbnm",            "2_zxcvbnm",            "3_zxcvbnm",            "4_vbnm",
+        "poiuytrewq",         "1_poiuytrewq",         "2_poiuytrewq",         "3_poiuytrewq",         "4_uytrewq",
+        "qazwsx",             "1_qazwsx",             "2_qazwsx",             "3_qazwsx",             "4_wsx",
+        "qazwsxedc",          "1_qazwsxedc",          "2_qazwsxedc",          "3_qazwsxedc",          "4_wsxedc",
+        "",                   "1_",                   "2_",                   "3_",                   "4_",
+        "abcdefghiabcdefghi", "1_abcdefghiabcdefghi", "2_abcdefghiabcdefghi", "3_abcdefghiabcdefghi", "4_defghiabcdefghi",
+        "defgh",              "1_defgh",              "2_defgh",              "3_defgh",              "4_gh",
+        "___defghi",          "1____defghi",          "2____defghi",          "3____defghi",          "4_defghi",
+        "_b_d_f_h_g",         "1__b_d_f_h_g",         "2__b_d_f_h_g",         "3__b_d_f_h_g",         "4_d_f_h_g",
+        "a_c_e_g_i_",         "1_a_c_e_g_i_",         "2_a_c_e_g_i_",         "3_a_c_e_g_i_",         "4__e_g_i_",
+        "acegi",              "1_acegi",              "2_acegi",              "3_acegi",              "4_gi",
+        "bacdfeghgi",         "1_bacdfeghgi",         "2_bacdfeghgi",         "3_bacdfeghgi",         "4_dfeghgi",
+        "gihgfedcba",         "1_gihgfedcba",         "2_gihgfedcba",         "3_gihgfedcba",         "4_gfedcba",
+    };
+    
+    clock_t start = clock();
+
+    for (int i = 0; i < 10000; ++i)
+    {
+        for(const std::string& s1 : words)
+            for(const std::string& s2 : words)
+                doNotOptimize += spellCheck.getSmartDistance(s1, s2);
+    }
+
+    clock_t end = clock() - start;
+
+    std::cout << doNotOptimize << ": " << end;
+}
 
