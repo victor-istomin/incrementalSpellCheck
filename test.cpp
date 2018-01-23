@@ -11,6 +11,7 @@ void unitTests();
 void interactive();
 void help();
 void profileOsa();
+void profileOsaIncremental();
 
 static const std::string s_help = "-h";
 
@@ -20,10 +21,11 @@ typedef std::map<std::string, CallbackInfo> Handlers;
 
 static Handlers s_handlers =
 {
-    {"-u",     {unitTests,   "unit test"}},
-    {"-i",     {interactive, "interactive"}},
-    {s_help,   {help,        "help"}},
-    {"-p_osa", {profileOsa,  "profile Optimal String Alignment code"}},
+    { "-u",       { &unitTests,             "unit test" } },
+    { "-i",       { &interactive,           "interactive" } },
+    { s_help,     { &help,                  "help" } },
+    { "-p_osa",   { &profileOsa,            "profile Optimal String Alignment code" } },
+    { "-p_osa_i", { &profileOsaIncremental, "profile Optimal String Alignment incremental code" } },
 };
 
 void help()
@@ -80,6 +82,8 @@ void interactive()
     static const char CTRL_C    = 0x03;
     static const char BACKSPACE = 0x08;
     static const char LINUX_DEL = 0x7F;
+
+    unitTests();
 
     IncrementalSearch search = load();
 
@@ -191,7 +195,7 @@ void unitTests()
 }
 
 
-void profileOsa()
+void profileSpellCheck(bool isIncremental)
 {
     int doNotOptimize = 0;
     SpellCheck spellCheck;
@@ -216,18 +220,28 @@ void profileOsa()
         "bacdfeghgi",         "1_bacdfeghgi",         "2_bacdfeghgi",         "3_bacdfeghgi",         "4_dfeghgi",
         "gihgfedcba",         "1_gihgfedcba",         "2_gihgfedcba",         "3_gihgfedcba",         "4_gfedcba",
     };
-    
+
     clock_t start = clock();
 
     for (int i = 0; i < 10000; ++i)
     {
-        for(const std::string& s1 : words)
-            for(const std::string& s2 : words)
-                doNotOptimize += spellCheck.getSmartDistance(s1, s2);
+        for (const std::string& s1 : words)
+            for (const std::string& s2 : words)
+                doNotOptimize += spellCheck.getSmartDistance(s1, s2, isIncremental);
     }
 
     clock_t end = clock() - start;
 
     std::cout << doNotOptimize << ": " << end;
+}
+
+void profileOsa()
+{
+    profileSpellCheck(false);
+}
+
+void profileOsaIncremental()
+{
+    profileSpellCheck(true);
 }
 

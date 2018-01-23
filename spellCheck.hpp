@@ -73,28 +73,24 @@ public:
         unsigned distance = optimalStringAlignementDistance(correctWord, initialWord);
 
         static const size_t k_minIncrSearchLen = 3;
-        if (isIncremental && initialWord.length() >= k_minIncrSearchLen)
+        if (isIncremental && initialWord.length() >= k_minIncrSearchLen && correctWord.length() > initialWord.length())
         {
             // ignore insertions past the end of word, assume user will type them later. To achieve this, 
             // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
 
-            unsigned insufficientChars = correctWord.length() > initialWord.length() ? correctWord.length() - initialWord.length() : 0;
-            if (insufficientChars > 0 && distance >= insufficientChars)
+            char wordEnding[k_minIncrSearchLen + 1];
+            int wordEndingPos = initialWord.length() - k_minIncrSearchLen;
+            std::copy_n(initialWord.c_str() + wordEndingPos, k_minIncrSearchLen + 1, wordEnding);
+
+            static const int k_endingDiffThreshold = 1;
+            size_t offset = (size_t) std::max(0, wordEndingPos - k_endingDiffThreshold);
+            auto posInCorrectWord = correctWord.find(wordEnding, offset);
+            int endingPosDifference = std::abs(wordEndingPos - (int)posInCorrectWord);
+
+            if (posInCorrectWord != std::string::npos && endingPosDifference <= k_endingDiffThreshold)
             {
-                char wordEnding[k_minIncrSearchLen + 1];
-                int wordEndingPos = initialWord.length() - k_minIncrSearchLen;
-                std::copy_n(initialWord.c_str() + wordEndingPos, k_minIncrSearchLen + 1, wordEnding);
-
-                static const int k_endingDiffThreshold = 1;
-                size_t offset = (size_t) std::max(0, wordEndingPos - k_endingDiffThreshold);
-                auto posInCorrectWord = correctWord.find(wordEnding, offset);
-                int endingPosDifference = std::abs(wordEndingPos - (int)posInCorrectWord);
-
-                if (posInCorrectWord != std::string::npos && endingPosDifference <= k_endingDiffThreshold)
-                {
-                    insufficientChars = correctWord.length() - posInCorrectWord - std::size(wordEnding) + 1;
-                    distance -= insufficientChars;
-                }
+                int insufficientChars = correctWord.length() - posInCorrectWord - std::size(wordEnding) + 1;
+                distance -= insufficientChars;
             }
         }
 
