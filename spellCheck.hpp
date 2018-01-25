@@ -78,9 +78,8 @@ public:
             // ignore insertions past the end of word, assume user will type them later. To achieve this, 
             // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
 
-            char wordEnding[k_minIncrSearchLen + 1];
             int wordEndingPos = initialWord.length() - k_minIncrSearchLen;
-            std::copy_n(initialWord.c_str() + wordEndingPos, k_minIncrSearchLen + 1, wordEnding);
+            const char* wordEnding = initialWord.data() + wordEndingPos;
 
             static const int k_endingDiffThreshold = 1;
             size_t offset = (size_t) std::max(0, wordEndingPos - k_endingDiffThreshold);
@@ -89,7 +88,7 @@ public:
 
             if (posInCorrectWord != std::string::npos && endingPosDifference <= k_endingDiffThreshold)
             {
-                int insufficientChars = correctWord.length() - posInCorrectWord - std::size(wordEnding) + 1;
+                int insufficientChars = correctWord.length() - posInCorrectWord - k_minIncrSearchLen;
                 distance -= insufficientChars;
             }
         }
