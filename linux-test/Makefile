@@ -13,7 +13,7 @@ tests: $(OUT)
 
 debug: CXXFLAGS_Actual=$(CXXFLAGS_Debug)
 debug: $(OUT)
-	$(OUT) -u
+	$(OUT) -u || true
 
 
 $(OUT): $(SRCS) .depend alldeps
