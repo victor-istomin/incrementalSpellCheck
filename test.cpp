@@ -170,7 +170,7 @@ void unitTests()
 
     // incremental spell check
     assert(spellChecker.getSmartDistance("abcd",  "ab",  true) == 2);      // too short for meaningful incremental search
-    assert(spellChecker.getSmartDistance("abcde", "xbc", true) == 3);      // too short common ending for meaningful incremental search
+    assert(spellChecker.getSmartDistance("abcde", "xbc", true) == 1);      // xbc -> abc -> abc.* (incremental match)
 
     assert(spellChecker.getSmartDistance("abcd",  "abc", true) == 0);      // 'abc.*' matches 'abcd'
     assert(spellChecker.getSmartDistance("abcde", "abc", true) == 0);      // 'abc.*' matches 'abcde'
@@ -179,11 +179,12 @@ void unitTests()
     assert(spellChecker.getSmartDistance("abcdefg", "bcd", true) == 1);
     assert(spellChecker.getSmartDistance("abcdefg", "acde", true) == 1);   // acde -> abcde, then incremental
 
-    assert(spellChecker.getSmartDistance("abcdefg", "cde", true) == 4);    // common substring 'cde' located at too different word positions
+    assert(spellChecker.getSmartDistance("abcdefg", "cde", true) == 2);    // 'cde' -> 'acbcd' (2) -> 'abcde.*'
 
     assert(spellChecker.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
 
-    assert(spellChecker.getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
+	assert(spellChecker.getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
+	assert(spellChecker.getSmartDistance("abcde", "bac", true) == 1);     // bac -> abc, then incremental
 
     SpellCheck other;
     assert(other.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match

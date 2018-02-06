@@ -6,6 +6,27 @@
 #include <list>
 #include <array>
 #include <cstring>
+#include <limits>
+#include <cassert>
+
+#if defined DUMP
+#include <iostream>
+#include <iomanip>
+
+template <typename Item>
+void dump(Item* buffer, size_t width, size_t height)
+{
+	for(size_t row = 0; row < height; ++row)
+	{
+		for(size_t column = 0; column < width; ++column)
+			std::cout << std::setw(4) << buffer[row * width + column];
+
+		std::cout << std::endl;
+	}
+}
+
+#endif
+
 
 class SpellCheck
 {
@@ -64,13 +85,11 @@ public:
     // Note that parameters order is important in incremental version, 
     // because it's asymmetric ('abc.*' matches 'abcd', but 'abcd.*' does not match 'abc')
     //
-    // Bug: deletions will lead to extra cost in incremental distance: 
-    //      getSmartDistance("abcdefg", "xabc",  true) == 3 instead of 1
-    //
     // See getCorrections() for incremental explanations or optimalStringAlignementDistance() for OSA distance details
     unsigned getSmartDistance(const std::string& correctWord, const std::string& initialWord, bool isIncremental = false) const
     {
-        unsigned distance = optimalStringAlignementDistance(correctWord, initialWord);
+		std::list<CorrectionType> traceback;
+        unsigned distance = optimalStringAlignementDistance(correctWord, initialWord, traceback);
 
         static const size_t k_minIncrSearchLen = 3;
         if (isIncremental && initialWord.length() >= k_minIncrSearchLen && correctWord.length() > initialWord.length())
@@ -78,19 +97,11 @@ public:
             // ignore insertions past the end of word, assume user will type them later. To achieve this, 
             // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
 
-            int wordEndingPos = initialWord.length() - k_minIncrSearchLen;
-            const char* wordEnding = initialWord.data() + wordEndingPos;
+			int insertionsPastEnd = 0;
+			for(auto it = traceback.rbegin(); it != traceback.rend() && *it == CorrectionType::eINSERTION; ++it)
+				++insertionsPastEnd;
 
-            static const int k_endingDiffThreshold = 1;
-            size_t offset = (size_t) std::max(0, wordEndingPos - k_endingDiffThreshold);
-            auto posInCorrectWord = correctWord.find(wordEnding, offset);
-            int endingPosDifference = std::abs(wordEndingPos - (int)posInCorrectWord);
-
-            if (posInCorrectWord != std::string::npos && endingPosDifference <= k_endingDiffThreshold)
-            {
-                int insufficientChars = correctWord.length() - posInCorrectWord - k_minIncrSearchLen;
-                distance -= insufficientChars;
-            }
+			distance -= insertionsPastEnd;
         }
 
         return distance;
@@ -135,13 +146,14 @@ private:
         }
     }
 
+	template <typename T>
     class Buffer
     {
         static const size_t STATIC_SIZE = 16 * 16;
 
-        std::array<unsigned, STATIC_SIZE> m_static;
-        std::vector<unsigned>             m_dynamic;
-        unsigned*                         m_actual;
+        std::array<T, STATIC_SIZE> m_static;
+        std::vector<T>             m_dynamic;
+        T*                         m_actual;
 
         Buffer(const Buffer&)            = delete;
         Buffer(const Buffer&&)           = delete;
@@ -160,25 +172,58 @@ private:
             }
         }
 
-        unsigned&       operator[](size_t index)       { return m_actual[index]; }
-        const unsigned& operator[](size_t index) const { return m_actual[index]; }
+        T&       operator[](size_t index)       { return m_actual[index]; }
+        const T& operator[](size_t index) const { return m_actual[index]; }
     };
 
-    unsigned optimalStringAlignementDistance(const std::string& source, const std::string& target) const
+	enum class CorrectionType : char
+	{
+		eNOT_INITIALIZED = 0,
+		eNONE,
+		eSUBSTITUTION,
+		eDELETION,
+		eINSERTION,
+		eTRANSPOSITION
+	};
+
+
+	struct Alternative
+	{
+		CorrectionType bestType = CorrectionType::eNOT_INITIALIZED;
+		int bestDistance = std::numeric_limits<int>::max();
+
+		Alternative() = default;
+
+		void propose(CorrectionType type, int newCost)
+		{
+			if(bestDistance > newCost)
+			{
+				bestDistance = newCost;
+				bestType = type;
+			}
+		}
+	};
+
+    unsigned optimalStringAlignementDistance(const std::string& source, const std::string& target, std::list<CorrectionType>& traceback) const
     {
         // it's a variation of Damerau-Levenshtein distance with small improvement:
         // https://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance#Algorithm
         // LD_distance("CA", "ABC") == 2, while OSA_distance("CA", "ABC") == 3;
 
-        size_t width  = source.length() + 1;
-        size_t height = target.length() + 1;
+        int width  = source.length() + 1;
+        int height = target.length() + 1;
 
-        Buffer distanceMatrix(width * height);
-        std::iota(&distanceMatrix[0], &distanceMatrix[width], 0);  // 0,1,2,...,width
+        Buffer<unsigned>       distanceMatrix   (width * height);
+		Buffer<CorrectionType> correctionsMatrix(width * height);
+		
+		std::iota(&distanceMatrix[0], &distanceMatrix[width], 0);  // 0,1,2,...,width
+		std::fill(&correctionsMatrix[1], &correctionsMatrix[width], CorrectionType::eINSERTION);
 
         for (size_t i = 1, im = 0; i < height; ++i, ++im)
         {
             distanceMatrix[i * width] = (unsigned)i;
+			correctionsMatrix[i * width] = CorrectionType::eDELETION;
+
             for (size_t j = 1, jn = 0; j < width; ++j, ++jn)
             {
                 size_t thisRow = i * width;
@@ -186,29 +231,83 @@ private:
 
                 if (source[jn] == target[im])
                 {
-                    distanceMatrix[thisRow + j] = distanceMatrix[prevRow + (j - 1)];
+                    distanceMatrix[thisRow + j]    = distanceMatrix[prevRow + (j - 1)];
+					correctionsMatrix[thisRow + j] = CorrectionType::eNONE;
                 }
                 else
                 {
-                    unsigned nextCost = std::min(
-                    {
-                        distanceMatrix[prevRow + (j - 1)] + SUBSTITUTION, // a substitution
-                        distanceMatrix[prevRow + j]       + DELETION,     // a deletion
-                        distanceMatrix[thisRow + (j - 1)] + INSERTION     // an insertion
-                    });
+					Alternative correction;
+					correction.propose(CorrectionType::eSUBSTITUTION, distanceMatrix[prevRow + (j - 1)] + SUBSTITUTION);
+					correction.propose(CorrectionType::eDELETION,     distanceMatrix[prevRow + j]       + DELETION);
+					correction.propose(CorrectionType::eINSERTION,    distanceMatrix[thisRow + (j - 1)] + INSERTION);
 
                     // a transposition
                     if (i > 1 && j > 1 && source[jn] == target[im - 1] && source[jn - 1] == target[im])
                     {
-                        nextCost = std::min(nextCost, distanceMatrix[((i - 2) * width) + (j - 2)] + TRANSPOSITION);
+						correction.propose(CorrectionType::eTRANSPOSITION, distanceMatrix[((i - 2) * width) + (j - 2)] + TRANSPOSITION);
                     }
 
-                    distanceMatrix[thisRow + j] = nextCost;
+                    distanceMatrix[thisRow + j] = correction.bestDistance;
+					correctionsMatrix[thisRow + j] = correction.bestType;
                 }
             }
         }
 
         int distance = distanceMatrix[width * height - 1];
+
+#if defined DUMP
+		std::cout << "Costs:\n";
+		dump(&distanceMatrix[0], width, height);
+
+		std::cout << "Operations:\n";
+		dump(&correctionsMatrix[0], width, height);
+#endif
+
+		// backtrace. The idea description: https://web.stanford.edu/class/cs124/lec/med.pdf
+		int row = height - 1;
+		int column = width - 1;
+
+		traceback.clear();
+
+		while(row != 0 || column != 0)
+		{
+			CorrectionType fixType = correctionsMatrix[column + row * width];
+			traceback.push_front(fixType);
+
+			switch(fixType)
+			{
+			case CorrectionType::eNONE:
+			case CorrectionType::eSUBSTITUTION:
+				// diagonal by 1 cell
+				--column;
+				--row;
+				break;
+
+				break;
+			case CorrectionType::eDELETION:
+				// up by 1 cell
+				--row;
+				break;
+
+			case CorrectionType::eINSERTION:
+				// left
+				--column;
+				break;
+
+			case CorrectionType::eTRANSPOSITION:
+				// diagonal by 2 cells
+				column -= 2;
+				row -= 2;
+				break;
+
+			case CorrectionType::eNOT_INITIALIZED:
+			default:
+				assert(0 && "incorrect fixType");
+				break;
+			}
+
+		}
+
         return distance;
     }
 
