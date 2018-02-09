@@ -9,6 +9,11 @@
 #include <limits>
 #include <cassert>
 
+#ifdef max
+#undef max
+#define HAD_MAX_DEFINE
+#endif
+
 #if defined DUMP
 #include <iostream>
 #include <iomanip>
@@ -16,13 +21,13 @@
 template <typename Item>
 void dump(Item* buffer, size_t width, size_t height)
 {
-	for(size_t row = 0; row < height; ++row)
-	{
-		for(size_t column = 0; column < width; ++column)
-			std::cout << std::setw(4) << buffer[row * width + column];
+    for(size_t row = 0; row < height; ++row)
+    {
+        for(size_t column = 0; column < width; ++column)
+            std::cout << std::setw(4) << buffer[row * width + column];
 
-		std::cout << std::endl;
-	}
+        std::cout << std::endl;
+    }
 }
 
 #endif
@@ -34,15 +39,18 @@ public:
     // with no vocabulary, for distance computation only
     SpellCheck() {}
 
+    // use single string as vocabulary
+    SpellCheck(const char* text)
+    {
+        const char* array[] = { text };
+        *this = SpellCheck(array);
+    }
+
     // with vocabulary
     template <typename StringsArray>
     explicit SpellCheck(const StringsArray& text)
     {
-        Strings textVector;
-        textVector.reserve(std::size(text));
-        std::copy(std::begin(text), std::end(text), std::back_inserter(textVector));
-
-        for (const std::string& sentence : textVector)
+        for (const std::string& sentence : text)
             tokenize(sentence, m_tokens);
 
         std::sort(m_tokens.begin(), m_tokens.end());
@@ -67,7 +75,7 @@ public:
         {
             unsigned distance = getSmartDistance(correctWord, initialWord, isIncremental);
 
-            if (corrections.size() < maxCorrections || corrections.back().m_distance > distance)
+            if (corrections.empty() || corrections.back().m_distance > distance)
             {
                 // insert item, keep correction sorted
                 auto position = std::find_if(corrections.begin(), corrections.end(), [distance](const Correction& c) { return c.m_distance > distance; });
@@ -86,10 +94,10 @@ public:
     // because it's asymmetric ('abc.*' matches 'abcd', but 'abcd.*' does not match 'abc')
     //
     // See getCorrections() for incremental explanations or optimalStringAlignementDistance() for OSA distance details
-    unsigned getSmartDistance(const std::string& correctWord, const std::string& initialWord, bool isIncremental = false) const
+    static unsigned getSmartDistance(const std::string& correctWord, const std::string& initialWord, bool isIncremental = false)
     {
-		std::list<CorrectionType> traceback;
-        unsigned distance = optimalStringAlignementDistance(correctWord, initialWord, traceback);
+        Buffer<CorrectionType> traceback;
+        unsigned distance = optimalStringAlignementDistance(correctWord, initialWord, &traceback);
 
         static const size_t k_minIncrSearchLen = 3;
         if (isIncremental && initialWord.length() >= k_minIncrSearchLen && correctWord.length() > initialWord.length())
@@ -97,14 +105,43 @@ public:
             // ignore insertions past the end of word, assume user will type them later. To achieve this, 
             // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
 
-			int insertionsPastEnd = 0;
-			for(auto it = traceback.rbegin(); it != traceback.rend() && *it == CorrectionType::eINSERTION; ++it)
-				++insertionsPastEnd;
+            int insertionsPastEnd = 0;
+            for(auto it = traceback.rbegin(); it != traceback.rend() && *it == CorrectionType::eINSERTION; ++it)
+                ++insertionsPastEnd;
 
-			distance -= insertionsPastEnd;
+            distance -= insertionsPastEnd;
         }
 
         return distance;
+    }
+
+    typedef std::vector<std::string> Strings;
+
+    template <typename CaseConvertor = decltype(&tolower)>
+    static void tokenize(const std::string& input, Strings& insertInto, CaseConvertor changeCase = &tolower)
+    {
+        std::string nextToken;
+        nextToken.reserve(input.size());
+
+        for(size_t i = 0; i < input.size(); ++i)
+        {
+            int nextChar = input[i];
+            if(isalnum(nextChar))
+            {
+                nextToken += changeCase(nextChar);
+            }
+            else if(!nextToken.empty())
+            {
+                insertInto.push_back(nextToken);
+                nextToken.clear();
+            }
+        }
+
+        if(!nextToken.empty())
+        {
+            insertInto.push_back(nextToken);
+            nextToken.clear();
+        }
     }
 
 private:
@@ -116,37 +153,10 @@ private:
         TRANSPOSITION = 1,
     };
 
-    typedef std::vector<std::string> Strings;
 
     Strings m_tokens;
 
-    void tokenize(const std::string& input, Strings& insertInto)
-    {
-        std::string nextToken;
-        nextToken.reserve(input.size());
-
-        for (size_t i = 0; i < input.size(); ++i)
-        {
-            int nextChar = input[i];
-            if (isalnum(nextChar))
-            {
-                nextToken += tolower(nextChar);
-            }
-            else if (!nextToken.empty())
-            {
-                insertInto.push_back(nextToken);
-                nextToken.clear();
-            }
-        }
-
-        if (!nextToken.empty())
-        {
-            insertInto.push_back(nextToken);
-            nextToken.clear();
-        }
-    }
-
-	template <typename T>
+    template <typename T>
     class Buffer
     {
         static const size_t STATIC_SIZE = 16 * 16;
@@ -154,16 +164,61 @@ private:
         std::array<T, STATIC_SIZE> m_static;
         std::vector<T>             m_dynamic;
         T*                         m_actual;
+        size_t                     m_size;
 
         Buffer(const Buffer&)            = delete;
         Buffer(const Buffer&&)           = delete;
         Buffer& operator=(const Buffer&) = delete;
 
+        Buffer& operator=(Buffer&& other)
+        {
+            if(other.isStatic())
+            {
+                size_t itemsToMove = std::max((isStatic() ? m_size : 0), other.m_size);
+
+                for(size_t i = 0; i < itemsToMove; ++i)
+                    std::swap(m_static[i], other.m_static[i]);
+
+                m_actual = m_static.data();
+            }
+            else
+            {
+                std::swap(m_dynamic, other.m_dynamic);
+                m_actual = m_dynamic.data();
+            }
+
+            m_size = other.m_size;
+
+            other.m_actual = nullptr; // don't care about swapping current static/dynamic data into 'other'
+            other.m_size   = 0;
+            return *this;
+        }
+
+        bool isStatic() const { return m_actual == m_static.data(); }
+
+        class ReverseIterator : std::forward_iterator_tag
+        {
+            T* m_ptr;
+
+        public:
+            ReverseIterator(T* ptr) : m_ptr(ptr) {}
+
+            T& operator*()  { return *m_ptr; }
+            T* operator->() { return m_ptr; }
+
+            ReverseIterator operator++()    { return ReverseIterator{ --m_ptr }; }
+            ReverseIterator operator++(int) { ReverseIterator old{ m_ptr }; ++(*this); return old; }
+
+            bool operator==(const ReverseIterator& other) const { return m_ptr == other.m_ptr; }
+            bool operator!=(const ReverseIterator& other) const { return !(*this == other); }
+        };
+
     public:
-        explicit Buffer(size_t size)
+        explicit Buffer(size_t size = 0)
             : m_static()
             , m_dynamic()
             , m_actual(m_static.data())
+            , m_size(size)
         {
             if (size > STATIC_SIZE)
             {
@@ -172,57 +227,62 @@ private:
             }
         }
 
+        void reset(size_t newSize) { *this = Buffer(newSize); }
+
         T&       operator[](size_t index)       { return m_actual[index]; }
         const T& operator[](size_t index) const { return m_actual[index]; }
+
+        ReverseIterator rbegin() const { return ReverseIterator{ m_actual + m_size - 1 }; }
+        ReverseIterator rend() const   { return ReverseIterator{ m_actual - 1 }; }
     };
 
-	enum class CorrectionType : char
-	{
-		eNOT_INITIALIZED = 0,
-		eNONE,
-		eSUBSTITUTION,
-		eDELETION,
-		eINSERTION,
-		eTRANSPOSITION
-	};
+    enum class CorrectionType : char
+    {
+        eNOT_INITIALIZED = 0,
+        eNONE = 'n',
+        eSUBSTITUTION = 's',
+        eDELETION = 'd',
+        eINSERTION = 'i',
+        eTRANSPOSITION = 't'
+    };
 
 
-	struct Alternative
-	{
-		CorrectionType bestType = CorrectionType::eNOT_INITIALIZED;
-		int bestDistance = std::numeric_limits<int>::max();
+    struct Alternative
+    {
+        CorrectionType bestType = CorrectionType::eNOT_INITIALIZED;
+        int bestDistance = std::numeric_limits<int>::max();
 
-		Alternative() = default;
+        Alternative() = default;
 
-		void propose(CorrectionType type, int newCost)
-		{
-			if(bestDistance > newCost)
-			{
-				bestDistance = newCost;
-				bestType = type;
-			}
-		}
-	};
+        void propose(CorrectionType type, int newCost)
+        {
+            if(bestDistance > newCost)
+            {
+                bestDistance = newCost;
+                bestType = type;
+            }
+        }
+    };
 
-    unsigned optimalStringAlignementDistance(const std::string& source, const std::string& target, std::list<CorrectionType>& traceback) const
+    static unsigned optimalStringAlignementDistance(const std::string& source, const std::string& target, Buffer<CorrectionType>* backtrace = nullptr)
     {
         // it's a variation of Damerau-Levenshtein distance with small improvement:
         // https://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance#Algorithm
         // LD_distance("CA", "ABC") == 2, while OSA_distance("CA", "ABC") == 3;
 
-        int width  = source.length() + 1;
-        int height = target.length() + 1;
+        size_t width  = source.length() + 1;
+        size_t height = target.length() + 1;
 
         Buffer<unsigned>       distanceMatrix   (width * height);
-		Buffer<CorrectionType> correctionsMatrix(width * height);
-		
-		std::iota(&distanceMatrix[0], &distanceMatrix[width], 0);  // 0,1,2,...,width
-		std::fill(&correctionsMatrix[1], &correctionsMatrix[width], CorrectionType::eINSERTION);
+        Buffer<CorrectionType> correctionsMatrix(width * height);
+        
+        std::iota(&distanceMatrix[0], &distanceMatrix[width], 0);  // 0,1,2,...,width
+        std::fill(&correctionsMatrix[1], &correctionsMatrix[width], CorrectionType::eINSERTION);
 
         for (size_t i = 1, im = 0; i < height; ++i, ++im)
         {
             distanceMatrix[i * width] = (unsigned)i;
-			correctionsMatrix[i * width] = CorrectionType::eDELETION;
+            correctionsMatrix[i * width] = CorrectionType::eDELETION;
 
             for (size_t j = 1, jn = 0; j < width; ++j, ++jn)
             {
@@ -232,23 +292,27 @@ private:
                 if (source[jn] == target[im])
                 {
                     distanceMatrix[thisRow + j]    = distanceMatrix[prevRow + (j - 1)];
-					correctionsMatrix[thisRow + j] = CorrectionType::eNONE;
+                    correctionsMatrix[thisRow + j] = CorrectionType::eNONE;
                 }
                 else
                 {
-					Alternative correction;
-					correction.propose(CorrectionType::eSUBSTITUTION, distanceMatrix[prevRow + (j - 1)] + SUBSTITUTION);
-					correction.propose(CorrectionType::eDELETION,     distanceMatrix[prevRow + j]       + DELETION);
-					correction.propose(CorrectionType::eINSERTION,    distanceMatrix[thisRow + (j - 1)] + INSERTION);
+                    Alternative correction;
 
                     // a transposition
-                    if (i > 1 && j > 1 && source[jn] == target[im - 1] && source[jn - 1] == target[im])
+                    if(i > 1 && j > 1 && source[jn] == target[im - 1] && source[jn - 1] == target[im])
                     {
-						correction.propose(CorrectionType::eTRANSPOSITION, distanceMatrix[((i - 2) * width) + (j - 2)] + TRANSPOSITION);
+                        correction.propose(CorrectionType::eTRANSPOSITION, distanceMatrix[((i - 2) * width) + (j - 2)] + TRANSPOSITION);
                     }
 
+                    // BUG: insertion should be proposed before substitution, because both will resolve insufficient character after the end of 'source'
+                    // TODO: correct length difference handling
+
+                    correction.propose(CorrectionType::eINSERTION, distanceMatrix[thisRow + (j - 1)]    + INSERTION);
+                    correction.propose(CorrectionType::eSUBSTITUTION, distanceMatrix[prevRow + (j - 1)] + SUBSTITUTION);
+                    correction.propose(CorrectionType::eDELETION,     distanceMatrix[prevRow + j]       + DELETION);
+
                     distanceMatrix[thisRow + j] = correction.bestDistance;
-					correctionsMatrix[thisRow + j] = correction.bestType;
+                    correctionsMatrix[thisRow + j] = correction.bestType;
                 }
             }
         }
@@ -256,61 +320,73 @@ private:
         int distance = distanceMatrix[width * height - 1];
 
 #if defined DUMP
-		std::cout << "Costs:\n";
-		dump(&distanceMatrix[0], width, height);
+        std::cout << "Costs:\n";
+        dump(&distanceMatrix[0], width, height);
 
-		std::cout << "Operations:\n";
-		dump(&correctionsMatrix[0], width, height);
+        std::cout << "Operations:\n";
+        dump((char*) &correctionsMatrix[0], width, height);
 #endif
 
-		// backtrace. The idea description: https://web.stanford.edu/class/cs124/lec/med.pdf
-		int row = height - 1;
-		int column = width - 1;
+        if(backtrace != nullptr)
+        {
+            // backtrace. The idea description: https://web.stanford.edu/class/cs124/lec/med.pdf
+            int row    = height - 1;
+            int column = width - 1;
 
-		traceback.clear();
+            backtrace->reset(height + width);
+            auto itPrevious = backtrace->rbegin();
 
-		while(row != 0 || column != 0)
-		{
-			CorrectionType fixType = correctionsMatrix[column + row * width];
-			traceback.push_front(fixType);
+            while(row != 0 || column != 0)
+            {
+                CorrectionType fixType = correctionsMatrix[column + row * width];
+                
+                assert(itPrevious != backtrace->rend());
+                *itPrevious = fixType;
+                ++itPrevious;
 
-			switch(fixType)
-			{
-			case CorrectionType::eNONE:
-			case CorrectionType::eSUBSTITUTION:
-				// diagonal by 1 cell
-				--column;
-				--row;
-				break;
+                switch(fixType)
+                {
+                case CorrectionType::eNONE:
+                case CorrectionType::eSUBSTITUTION:
+                    // diagonal by 1 cell
+                    --column;
+                    --row;
+                    break;
 
-				break;
-			case CorrectionType::eDELETION:
-				// up by 1 cell
-				--row;
-				break;
+                    break;
+                case CorrectionType::eDELETION:
+                    // up by 1 cell
+                    --row;
+                    break;
 
-			case CorrectionType::eINSERTION:
-				// left
-				--column;
-				break;
+                case CorrectionType::eINSERTION:
+                    // left
+                    --column;
+                    break;
 
-			case CorrectionType::eTRANSPOSITION:
-				// diagonal by 2 cells
-				column -= 2;
-				row -= 2;
-				break;
+                case CorrectionType::eTRANSPOSITION:
+                    // diagonal by 2 cells
+                    column -= 2;
+                    row    -= 2;
+                    break;
 
-			case CorrectionType::eNOT_INITIALIZED:
-			default:
-				assert(0 && "incorrect fixType");
-				break;
-			}
+                case CorrectionType::eNOT_INITIALIZED:
+                default:
+                    assert(0 && "incorrect fixType");
+                    break;
+                }
 
-		}
+            }
+        }
+
 
         return distance;
     }
 
 };
 
+#ifdef HAD_MAX_DEFINE
+// from windows.h
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
 

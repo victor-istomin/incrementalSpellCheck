@@ -138,56 +138,60 @@ void interactive()
 void unitTests()
 {
     IncrementalSearch search = load();
-    const SpellCheck& spellChecker = search.getSpellCheck();
 
     // insertion
-    assert(spellChecker.getSmartDistance("abc", "abc") == 0);
-    assert(spellChecker.getSmartDistance("abc", "ab") == 1);
-    assert(spellChecker.getSmartDistance("abc", "ac") == 1);
-    assert(spellChecker.getSmartDistance("abc", "b") == 2);
-    assert(spellChecker.getSmartDistance("abc", "") == 3);
+    assert(SpellCheck::getSmartDistance("abc", "abc") == 0);
+    assert(SpellCheck::getSmartDistance("abc", "ab") == 1);
+    assert(SpellCheck::getSmartDistance("abc", "ac") == 1);
+    assert(SpellCheck::getSmartDistance("abc", "b") == 2);
+    assert(SpellCheck::getSmartDistance("abc", "") == 3);
 
     // deletion
-    assert(spellChecker.getSmartDistance("bc", "abc") == 1);
-    assert(spellChecker.getSmartDistance("ac", "abc") == 1);
-    assert(spellChecker.getSmartDistance("b", "abc") == 2);
-    assert(spellChecker.getSmartDistance("", "abc") == 3);
-    assert(spellChecker.getSmartDistance("", "") == 0);
+    assert(SpellCheck::getSmartDistance("bc", "abc") == 1);
+    assert(SpellCheck::getSmartDistance("ac", "abc") == 1);
+    assert(SpellCheck::getSmartDistance("b", "abc") == 2);
+    assert(SpellCheck::getSmartDistance("", "abc") == 3);
+    assert(SpellCheck::getSmartDistance("", "") == 0);
 
     // substitution
-    assert(spellChecker.getSmartDistance("abc", "abx") == 1);
-    assert(spellChecker.getSmartDistance("abc", "axx") == 2);
-    assert(spellChecker.getSmartDistance("abc", "xxx") == 3);
+    assert(SpellCheck::getSmartDistance("abc", "abx") == 1);
+    assert(SpellCheck::getSmartDistance("abc", "axx") == 2);
+    assert(SpellCheck::getSmartDistance("abc", "xxx") == 3);
 
     // transposition
-    assert(spellChecker.getSmartDistance("abc", "acb") == 1);
-    assert(spellChecker.getSmartDistance("abc", "bac") == 1);
-    assert(spellChecker.getSmartDistance("abc", "cba") == 2);
+    assert(SpellCheck::getSmartDistance("abc", "acb") == 1);
+    assert(SpellCheck::getSmartDistance("abc", "bac") == 1);
+    assert(SpellCheck::getSmartDistance("abc", "cba") == 2);
 
     // special case: Optimal string alignment distance
-    assert(spellChecker.getSmartDistance("ca", "abc") == 3);
-    assert(spellChecker.getSmartDistance("abc", "ca") == 3);
+    assert(SpellCheck::getSmartDistance("ca", "abc") == 3);
+    assert(SpellCheck::getSmartDistance("abc", "ca") == 3);
 
     // incremental spell check
-    assert(spellChecker.getSmartDistance("abcd",  "ab",  true) == 2);      // too short for meaningful incremental search
-    assert(spellChecker.getSmartDistance("abcde", "xbc", true) == 1);      // xbc -> abc -> abc.* (incremental match)
+    assert(SpellCheck::getSmartDistance("abcd",  "ab",  true) == 2);      // too short for meaningful incremental search
+    assert(SpellCheck::getSmartDistance("abcde", "xbc", true) == 1);      // xbc -> abc -> abc.* (incremental match)
 
-    assert(spellChecker.getSmartDistance("abcd",  "abc", true) == 0);      // 'abc.*' matches 'abcd'
-    assert(spellChecker.getSmartDistance("abcde", "abc", true) == 0);      // 'abc.*' matches 'abcde'
-    assert(spellChecker.getSmartDistance("abcde", "xbcd", true)  == 1);    // 1 correction xbcd -> abcd, then 'abc.*' matches 'abcde'
-    assert(spellChecker.getSmartDistance("abcdefg", "axcde", true) == 1);  // axcde -> abcde, then incremental
-    assert(spellChecker.getSmartDistance("abcdefg", "bcd", true) == 1);
-    assert(spellChecker.getSmartDistance("abcdefg", "acde", true) == 1);   // acde -> abcde, then incremental
+    assert(SpellCheck::getSmartDistance("abcd",  "abc", true) == 0);      // 'abc.*' matches 'abcd'
+    assert(SpellCheck::getSmartDistance("abcde", "abc", true) == 0);      // 'abc.*' matches 'abcde'
+    assert(SpellCheck::getSmartDistance("abcde", "xbcd", true)  == 1);    // 1 correction xbcd -> abcd, then 'abc.*' matches 'abcde'
+    assert(SpellCheck::getSmartDistance("abcdefg", "axcde", true) == 1);  // axcde -> abcde, then incremental
+    assert(SpellCheck::getSmartDistance("abcdefg", "bcd", true) == 1);
+    assert(SpellCheck::getSmartDistance("abcdefg", "acde", true) == 1);   // acde -> abcde, then incremental
 
-    assert(spellChecker.getSmartDistance("abcdefg", "cde", true) == 2);    // 'cde' -> 'acbcd' (2) -> 'abcde.*'
+    assert(SpellCheck::getSmartDistance("abcdefg", "cde", true) == 2);    // 'cde' -> 'acbcd' (2) -> 'abcde.*'
 
-    assert(spellChecker.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
+    assert(SpellCheck::getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
 
-	assert(spellChecker.getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
-	assert(spellChecker.getSmartDistance("abcde", "bac", true) == 1);     // bac -> abc, then incremental
+	assert(SpellCheck::getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
+	assert(SpellCheck::getSmartDistance("abcde", "bac", true) == 1);     // bac -> abc, then incremental
+
+	assert(SpellCheck::getSmartDistance("abcdefgh", "abdc", true) == 1); // transposition at end of string, then incremental match
 
     SpellCheck other;
     assert(other.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
+
+	assert(other.getSmartDistance("1234567890qwertyuiopasdfghjklzxcvbnm", "____1234567890zxcvbnm____", true) == 27);  // long strings
+
 
     const char* rawArray[] = { "one two", "Three" };
     SpellCheck fromRawArray { rawArray };
