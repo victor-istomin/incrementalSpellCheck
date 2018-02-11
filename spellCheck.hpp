@@ -110,6 +110,7 @@ public:
     template <typename String, typename StringsList, typename CaseConvertor = decltype(&tolower)>
     static void tokenize(const String& input, StringsList& insertInto,  CaseConvertor changeCase = &tolower)
     {
+        using Token = typename StringsList::value_type;
         std::string nextToken;
         nextToken.reserve(getSize(input));
 
@@ -122,14 +123,14 @@ public:
             }
             else if(!nextToken.empty())
             {
-                insertInto.push_back(StringsList::value_type(nextToken.c_str()));
+                insertInto.push_back(Token(nextToken.c_str()));
                 nextToken.clear();
             }
         }
 
         if(!nextToken.empty())
         {
-            insertInto.push_back(StringsList::value_type(nextToken.c_str()));
+            insertInto.push_back(Token(nextToken.c_str()));
             nextToken.clear();
         }
     }
