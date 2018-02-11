@@ -2,6 +2,10 @@
 
 This is C++ header-only implementation of incremental search within a list of captions (menu, articles, etc) with misprint corrections support. 
 
+## Demo
+
+![./test -i](linux-test/demo.gif)
+
 ## Contents
 
  * [incrementalSearch.hpp](incrementalSearch.hpp) - search implementation
@@ -9,6 +13,7 @@ This is C++ header-only implementation of incremental search within a list of ca
  * [test.cpp](test.cpp) - a kind of tests and usage example.
  * [msvc-test](msvc-test) - test solution for MSVC 2015 and higher
  * [linux-test](linux-test) - Linux Makefile
+ * [linux-test/demo.gif](linux-test/demo.gif) - demo gif
  * getch.cpp, getch.h - a stub for similar getch() on windows and Linux
  * [list of Wikipedia core articles](https://github.com/victor-istomin/incrementalSpellcheck/blob/master/incrementalSpellcheck/wikipedia.txt) is used as text to perform search in
 
