@@ -76,6 +76,8 @@ IncrementalSearch load()
     return std::move(IncrementalSearch { wikipedia });
 }
 
+#undef max
+
 void interactive()
 {
     static const char ESC       = 0x1b;
@@ -180,18 +182,16 @@ void unitTests()
 
     assert(SpellCheck::getSmartDistance("abcdefg", "cde", true) == 2);    // 'cde' -> 'acbcd' (2) -> 'abcde.*'
 
-    assert(SpellCheck::getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
+    assert(SpellCheck::getSmartDistance("abcde", std::string("xbcd"), true) == 1);     // 1 correction xbcd -> abcd, then incremental match
 
 	assert(SpellCheck::getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
 	assert(SpellCheck::getSmartDistance("abcde", "bac", true) == 1);     // bac -> abc, then incremental
 
 	assert(SpellCheck::getSmartDistance("abcdefgh", "abdc", true) == 1); // transposition at end of string, then incremental match
 
-    SpellCheck other;
-    assert(other.getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
+    assert(SpellCheck::getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
 
-	assert(other.getSmartDistance("1234567890qwertyuiopasdfghjklzxcvbnm", "____1234567890zxcvbnm____", true) == 27);  // long strings
-
+	assert(SpellCheck::getSmartDistance("1234567890qwertyuiopasdfghjklzxcvbnm", "____1234567890zxcvbnm____", true) == 27);  // long strings
 
     const char* rawArray[] = { "one two", "Three" };
     SpellCheck fromRawArray { rawArray };
@@ -203,7 +203,6 @@ void unitTests()
 void profileSpellCheck(bool isIncremental)
 {
     int doNotOptimize = 0;
-    SpellCheck spellCheck;
 
     static const std::string words[] =
     {
@@ -232,7 +231,7 @@ void profileSpellCheck(bool isIncremental)
     {
         for (const std::string& s1 : words)
             for (const std::string& s2 : words)
-                doNotOptimize += spellCheck.getSmartDistance(s1, s2, isIncremental);
+                doNotOptimize += SpellCheck::getSmartDistance(s1, s2, isIncremental);
     }
 
     clock_t end = clock() - start;

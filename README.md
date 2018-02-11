@@ -32,16 +32,23 @@ This is C++ header-only implementation of incremental search within a list of ca
      SpellCheck speller { textCorpus };
      
      const size_t maxCount = 2;
-     auto corrections = speller.getCorrections("tree", maxCount);
+     auto corrections = speller.getCorrections("tree", maxCount);                  // "three"
      auto incrementalCorrections = speller.getCorrections("_ery", maxCount, true); // "_ery" -> "very.*" -> "verylongword"
  }
  
  void h()
  {
-      SpellCheck speller;
-      speller.getSmartDistance("abcde", "abc"); // == 2
-      speller.getSmartDistance("abcde", "abc", true/*incremental*/); // == 0, "abc" -> "abc.*" -> "abcde"
+      SpellCheck::getSmartDistance("abcde", "abc"); // == 2
+      SpellCheck::getSmartDistance(CString("abcde"), std::string("abcd"));
+
+      SpellCheck::getSmartDistance("abcde", "abc", true/*incremental*/); // == 0, "abc" -> "abc.*" -> "abcde"
  }
  ```
- 
+
+ ## Supported compilers
+
+C++ 14 with at least partial SFINAE is needed. Testsed on:
+  * Visual Studio 2015 update 3
+  * gcc 7.2
+
  See [test.cpp](test.cpp) for more detailed examples.

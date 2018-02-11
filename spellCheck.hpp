@@ -36,22 +36,12 @@ void dump(Item* buffer, size_t width, size_t height)
 class SpellCheck
 {
 public:
-    // with no vocabulary, for distance computation only
-    SpellCheck() {}
-
-    // use single string as vocabulary
-    SpellCheck(const char* text)
-    {
-        const char* array[] = { text };
-        *this = SpellCheck(array);
-    }
-
     // with vocabulary
-    template <typename StringsArray>
-    explicit SpellCheck(const StringsArray& text)
+    template <typename StringsArray, typename CaseConvertor = decltype(&tolower)>
+    explicit SpellCheck(const StringsArray& text, CaseConvertor changeCase = &tolower)
     {
-        for (const std::string& sentence : text)
-            tokenize(sentence, m_tokens);
+        for (const auto& sentence : text)
+            tokenize(sentence, m_tokens, changeCase);
 
         std::sort(m_tokens.begin(), m_tokens.end());
         m_tokens.erase(std::unique(m_tokens.begin(), m_tokens.end()), m_tokens.end());
@@ -67,7 +57,8 @@ public:
 
     // Get a list if correction suggestions. In case of 'isIncremental', don't count insertions past the end if 'initialWord', 
     // assume that user will type insufficient chars later
-    Corrections getCorrections(const std::string& initialWord, unsigned maxCorrections, bool isIncremental = false) const
+	template <typename String>
+    Corrections getCorrections(const String& initialWord, unsigned maxCorrections, bool isIncremental = false) const
     {
         Corrections corrections;
 
@@ -94,17 +85,16 @@ public:
     // because it's asymmetric ('abc.*' matches 'abcd', but 'abcd.*' does not match 'abc')
     //
     // See getCorrections() for incremental explanations or optimalStringAlignementDistance() for OSA distance details
-    static unsigned getSmartDistance(const std::string& correctWord, const std::string& initialWord, bool isIncremental = false)
+	template <typename String, typename OtherString>
+    static unsigned getSmartDistance(const String& correctWord, const OtherString& initialWord, bool isIncremental = false)
     {
         Buffer<CorrectionType> traceback;
         unsigned distance = optimalStringAlignementDistance(correctWord, initialWord, &traceback);
 
         static const size_t k_minIncrSearchLen = 3;
-        if (isIncremental && initialWord.length() >= k_minIncrSearchLen && correctWord.length() > initialWord.length())
+        if (isIncremental && getSize(initialWord) >= k_minIncrSearchLen && getSize(correctWord) > getSize(initialWord))
         {
-            // ignore insertions past the end of word, assume user will type them later. To achieve this, 
-            // decrease distance if vocabulary word contains ending of input word and that ending is located in the similar place
-
+            // ignore insertions past the end of word, assume user will type them later.
             int insertionsPastEnd = 0;
             for(auto it = traceback.rbegin(); it != traceback.rend() && *it == CorrectionType::eINSERTION; ++it)
                 ++insertionsPastEnd;
@@ -117,13 +107,13 @@ public:
 
     typedef std::vector<std::string> Strings;
 
-    template <typename CaseConvertor = decltype(&tolower)>
-    static void tokenize(const std::string& input, Strings& insertInto, CaseConvertor changeCase = &tolower)
+    template <typename String, typename StringsList, typename CaseConvertor = decltype(&tolower)>
+    static void tokenize(const String& input, StringsList& insertInto,  CaseConvertor changeCase = &tolower)
     {
         std::string nextToken;
-        nextToken.reserve(input.size());
+        nextToken.reserve(getSize(input));
 
-        for(size_t i = 0; i < input.size(); ++i)
+        for(size_t i = 0; i < getSize(input); ++i)
         {
             int nextChar = input[i];
             if(isalnum(nextChar))
@@ -132,14 +122,14 @@ public:
             }
             else if(!nextToken.empty())
             {
-                insertInto.push_back(nextToken);
+                insertInto.push_back(StringsList::value_type(nextToken.c_str()));
                 nextToken.clear();
             }
         }
 
         if(!nextToken.empty())
         {
-            insertInto.push_back(nextToken);
+            insertInto.push_back(StringsList::value_type(nextToken.c_str()));
             nextToken.clear();
         }
     }
@@ -167,32 +157,7 @@ private:
         size_t                     m_size;
 
         Buffer(const Buffer&)            = delete;
-        Buffer(const Buffer&&)           = delete;
         Buffer& operator=(const Buffer&) = delete;
-
-        Buffer& operator=(Buffer&& other)
-        {
-            if(other.isStatic())
-            {
-                size_t itemsToMove = std::max((isStatic() ? m_size : 0), other.m_size);
-
-                for(size_t i = 0; i < itemsToMove; ++i)
-                    std::swap(m_static[i], other.m_static[i]);
-
-                m_actual = m_static.data();
-            }
-            else
-            {
-                std::swap(m_dynamic, other.m_dynamic);
-                m_actual = m_dynamic.data();
-            }
-
-            m_size = other.m_size;
-
-            other.m_actual = nullptr; // don't care about swapping current static/dynamic data into 'other'
-            other.m_size   = 0;
-            return *this;
-        }
 
         bool isStatic() const { return m_actual == m_static.data(); }
 
@@ -226,6 +191,36 @@ private:
                 m_actual = m_dynamic.data();
             }
         }
+
+		Buffer(Buffer&& right)
+		{
+			*this = std::move(right);
+		}
+
+		Buffer& operator=(Buffer&& other)
+		{
+			if(other.isStatic())
+			{
+				size_t itemsToMove = std::max((isStatic() ? m_size : 0), other.m_size);
+
+				for(size_t i = 0; i < itemsToMove; ++i)
+					std::swap(m_static[i], other.m_static[i]);
+
+				m_actual = m_static.data();
+			}
+			else
+			{
+				std::swap(m_dynamic, other.m_dynamic);
+				m_actual = m_dynamic.data();
+			}
+
+			m_size = other.m_size;
+
+			other.m_actual = nullptr; // don't care about swapping current static/dynamic data into 'other'
+			other.m_size = 0;
+			return *this;
+		}
+
 
         void reset(size_t newSize) { *this = Buffer(newSize); }
 
@@ -264,14 +259,32 @@ private:
         }
     };
 
-    static unsigned optimalStringAlignementDistance(const std::string& source, const std::string& target, Buffer<CorrectionType>* backtrace = nullptr)
+	// std::string support
+    template <typename T> static auto getSize(const T& string) -> decltype(string.size())
+    { 
+        return string.size();
+    }
+
+	// CString support
+    template <typename T> static auto getSize(const T& string) -> decltype(static_cast<size_t>(string.GetLength()))
+    { 
+        return static_cast<size_t>(string.GetLength());
+    }
+
+	static size_t getSize(const char* string)
+	{
+		return strlen(string);
+	}
+
+	template <typename String, typename OtherString>
+    static unsigned optimalStringAlignementDistance(const String& source, const OtherString& target, Buffer<CorrectionType>* backtrace = nullptr)
     {
         // it's a variation of Damerau-Levenshtein distance with small improvement:
         // https://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance#Algorithm
         // LD_distance("CA", "ABC") == 2, while OSA_distance("CA", "ABC") == 3;
 
-        size_t width  = source.length() + 1;
-        size_t height = target.length() + 1;
+        size_t width  = getSize(source) + 1;
+        size_t height = getSize(target) + 1;
 
         Buffer<unsigned>       distanceMatrix   (width * height);
         Buffer<CorrectionType> correctionsMatrix(width * height);
@@ -307,7 +320,7 @@ private:
                     // BUG: insertion should be proposed before substitution, because both will resolve insufficient character after the end of 'source'
                     // TODO: correct length difference handling
 
-                    correction.propose(CorrectionType::eINSERTION, distanceMatrix[thisRow + (j - 1)]    + INSERTION);
+                    correction.propose(CorrectionType::eINSERTION,    distanceMatrix[thisRow + (j - 1)] + INSERTION);
                     correction.propose(CorrectionType::eSUBSTITUTION, distanceMatrix[prevRow + (j - 1)] + SUBSTITUTION);
                     correction.propose(CorrectionType::eDELETION,     distanceMatrix[prevRow + j]       + DELETION);
 
@@ -329,59 +342,60 @@ private:
 
         if(backtrace != nullptr)
         {
-            // backtrace. The idea description: https://web.stanford.edu/class/cs124/lec/med.pdf
-            int row    = height - 1;
-            int column = width - 1;
-
-            backtrace->reset(height + width);
-            auto itPrevious = backtrace->rbegin();
-
-            while(row != 0 || column != 0)
-            {
-                CorrectionType fixType = correctionsMatrix[column + row * width];
-                
-                assert(itPrevious != backtrace->rend());
-                *itPrevious = fixType;
-                ++itPrevious;
-
-                switch(fixType)
-                {
-                case CorrectionType::eNONE:
-                case CorrectionType::eSUBSTITUTION:
-                    // diagonal by 1 cell
-                    --column;
-                    --row;
-                    break;
-
-                    break;
-                case CorrectionType::eDELETION:
-                    // up by 1 cell
-                    --row;
-                    break;
-
-                case CorrectionType::eINSERTION:
-                    // left
-                    --column;
-                    break;
-
-                case CorrectionType::eTRANSPOSITION:
-                    // diagonal by 2 cells
-                    column -= 2;
-                    row    -= 2;
-                    break;
-
-                case CorrectionType::eNOT_INITIALIZED:
-                default:
-                    assert(0 && "incorrect fixType");
-                    break;
-                }
-
-            }
-        }
-
+			*backtrace = optimalStringAlignmentBacktrace(height, width, correctionsMatrix);
+		}
 
         return distance;
     }
+
+	// backtrace. The idea description: https://web.stanford.edu/class/cs124/lec/med.pdf
+	static Buffer<CorrectionType> optimalStringAlignmentBacktrace(size_t height, size_t width, const Buffer<CorrectionType>& correctionsMatrix)
+	{
+		Buffer<CorrectionType> backtrace(height + width);
+
+		int row    = height - 1;
+		int column = width - 1;
+
+		auto itPrevious = backtrace.rbegin();
+
+		while(row != 0 || column != 0)
+		{
+			CorrectionType fixType = correctionsMatrix[column + row * width];
+
+			assert(itPrevious != backtrace.rend());
+			*itPrevious = fixType;
+			++itPrevious;
+
+			switch(fixType)
+			{
+			case CorrectionType::eNONE:
+			case CorrectionType::eSUBSTITUTION:     // moved diagonal by 1 cell
+				--column;
+				--row;
+				break;
+
+			case CorrectionType::eDELETION:         // moved up by 1 cell
+				--row;
+				break;
+
+			case CorrectionType::eINSERTION:        // moved left
+				--column;
+				break;
+
+			case CorrectionType::eTRANSPOSITION:    // moved diagonal by 2 cells
+				column -= 2;
+				row    -= 2;
+				break;
+
+			case CorrectionType::eNOT_INITIALIZED:
+			default:
+				assert(0 && "incorrect fixType");
+				break;
+			}
+		}
+
+		return backtrace;
+	}
 
 };
 
