@@ -133,7 +133,7 @@ void interactive()
         for (const SpellCheck::Correction& correction : search.getCorrections(substring))
             std::cout << correction.m_distance << ": " << *correction.m_word << "; ";
 
-        std::cout << "} (" << elapsedTime << " clocks) " << std::endl;
+        std::cout << "} (" << static_cast<int>((double)elapsedTime/CLOCKS_PER_SEC * 1000) << "ms)" << std::endl;
     }
 }
 
