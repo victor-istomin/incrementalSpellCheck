@@ -51,7 +51,7 @@ This is C++ header-only implementation of incremental search within a list of ca
 
  ## Supported compilers
 
-C++ 14 with at least partial SFINAE is needed. Testsed on:
+C++ 14 with at least partial expression SFINAE is needed. Testsed on:
   * Visual Studio 2015 update 3
   * gcc 7.2
 
