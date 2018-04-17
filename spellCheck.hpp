@@ -260,13 +260,13 @@ private:
         }
     };
 
-    // std::string support
+    // std::string support. Note: 'auto' return type is needed in order to force "expression SFINAE" to work under MSVC 2015
     template <typename T> static auto getSize(const T& string) -> decltype(string.size())
     { 
         return string.size();
     }
 
-    // CString support
+    // CString support. Note: 'auto' return type is needed in order to force "expression SFINAE" to work under MSVC 2015
     template <typename T> static auto getSize(const T& string) -> decltype(static_cast<size_t>(string.GetLength()))
     { 
         return static_cast<size_t>(string.GetLength());
