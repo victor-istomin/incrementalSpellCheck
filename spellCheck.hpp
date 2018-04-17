@@ -57,7 +57,7 @@ public:
 
     // Get a list if correction suggestions. In case of 'isIncremental', don't count insertions past the end if 'initialWord', 
     // assume that user will type insufficient chars later
-	template <typename String>
+    template <typename String>
     Corrections getCorrections(const String& initialWord, unsigned maxCorrections, bool isIncremental = false) const
     {
         Corrections corrections;
@@ -85,7 +85,7 @@ public:
     // because it's asymmetric ('abc.*' matches 'abcd', but 'abcd.*' does not match 'abc')
     //
     // See getCorrections() for incremental explanations or optimalStringAlignementDistance() for OSA distance details
-	template <typename String, typename OtherString>
+    template <typename String, typename OtherString>
     static unsigned getSmartDistance(const String& correctWord, const OtherString& initialWord, bool isIncremental = false)
     {
         Buffer<CorrectionType> traceback;
@@ -193,34 +193,34 @@ private:
             }
         }
 
-		Buffer(Buffer&& right)
-		{
-			*this = std::move(right);
-		}
+        Buffer(Buffer&& right)
+        {
+            *this = std::move(right);
+        }
 
-		Buffer& operator=(Buffer&& other)
-		{
-			if(other.isStatic())
-			{
-				size_t itemsToMove = std::max((isStatic() ? m_size : 0), other.m_size);
+        Buffer& operator=(Buffer&& other)
+        {
+            if(other.isStatic())
+            {
+                size_t itemsToMove = std::max((isStatic() ? m_size : 0), other.m_size);
 
-				for(size_t i = 0; i < itemsToMove; ++i)
-					std::swap(m_static[i], other.m_static[i]);
+                for(size_t i = 0; i < itemsToMove; ++i)
+                    std::swap(m_static[i], other.m_static[i]);
 
-				m_actual = m_static.data();
-			}
-			else
-			{
-				std::swap(m_dynamic, other.m_dynamic);
-				m_actual = m_dynamic.data();
-			}
+                m_actual = m_static.data();
+            }
+            else
+            {
+                std::swap(m_dynamic, other.m_dynamic);
+                m_actual = m_dynamic.data();
+            }
 
-			m_size = other.m_size;
+            m_size = other.m_size;
 
-			other.m_actual = nullptr; // don't care about swapping current static/dynamic data into 'other'
-			other.m_size = 0;
-			return *this;
-		}
+            other.m_actual = nullptr; // don't care about swapping current static/dynamic data into 'other'
+            other.m_size = 0;
+            return *this;
+        }
 
 
         void reset(size_t newSize) { *this = Buffer(newSize); }
@@ -260,24 +260,24 @@ private:
         }
     };
 
-	// std::string support
+    // std::string support
     template <typename T> static auto getSize(const T& string) -> decltype(string.size())
     { 
         return string.size();
     }
 
-	// CString support
+    // CString support
     template <typename T> static auto getSize(const T& string) -> decltype(static_cast<size_t>(string.GetLength()))
     { 
         return static_cast<size_t>(string.GetLength());
     }
 
-	static size_t getSize(const char* string)
-	{
-		return strlen(string);
-	}
+    static size_t getSize(const char* string)
+    {
+        return strlen(string);
+    }
 
-	template <typename String, typename OtherString>
+    template <typename String, typename OtherString>
     static unsigned optimalStringAlignementDistance(const String& source, const OtherString& target, Buffer<CorrectionType>* backtrace = nullptr)
     {
         // it's a variation of Damerau-Levenshtein distance with small improvement:
@@ -343,60 +343,60 @@ private:
 
         if(backtrace != nullptr)
         {
-			*backtrace = optimalStringAlignmentBacktrace(height, width, correctionsMatrix);
-		}
+            *backtrace = optimalStringAlignmentBacktrace(height, width, correctionsMatrix);
+        }
 
         return distance;
     }
 
-	// backtrace. The idea description: https://web.stanford.edu/class/cs124/lec/med.pdf
-	static Buffer<CorrectionType> optimalStringAlignmentBacktrace(size_t height, size_t width, const Buffer<CorrectionType>& correctionsMatrix)
-	{
-		Buffer<CorrectionType> backtrace(height + width);
+    // backtrace. The idea description: https://web.stanford.edu/class/cs124/lec/med.pdf
+    static Buffer<CorrectionType> optimalStringAlignmentBacktrace(size_t height, size_t width, const Buffer<CorrectionType>& correctionsMatrix)
+    {
+        Buffer<CorrectionType> backtrace(height + width);
 
-		int row    = height - 1;
-		int column = width - 1;
+        int row    = height - 1;
+        int column = width - 1;
 
-		auto itPrevious = backtrace.rbegin();
+        auto itPrevious = backtrace.rbegin();
 
-		while(row != 0 || column != 0)
-		{
-			CorrectionType fixType = correctionsMatrix[column + row * width];
+        while(row != 0 || column != 0)
+        {
+            CorrectionType fixType = correctionsMatrix[column + row * width];
 
-			assert(itPrevious != backtrace.rend());
-			*itPrevious = fixType;
-			++itPrevious;
+            assert(itPrevious != backtrace.rend());
+            *itPrevious = fixType;
+            ++itPrevious;
 
-			switch(fixType)
-			{
-			case CorrectionType::eNONE:
-			case CorrectionType::eSUBSTITUTION:     // moved diagonal by 1 cell
-				--column;
-				--row;
-				break;
+            switch(fixType)
+            {
+            case CorrectionType::eNONE:
+            case CorrectionType::eSUBSTITUTION:     // moved diagonal by 1 cell
+                --column;
+                --row;
+                break;
 
-			case CorrectionType::eDELETION:         // moved up by 1 cell
-				--row;
-				break;
+            case CorrectionType::eDELETION:         // moved up by 1 cell
+                --row;
+                break;
 
-			case CorrectionType::eINSERTION:        // moved left
-				--column;
-				break;
+            case CorrectionType::eINSERTION:        // moved left
+                --column;
+                break;
 
-			case CorrectionType::eTRANSPOSITION:    // moved diagonal by 2 cells
-				column -= 2;
-				row    -= 2;
-				break;
+            case CorrectionType::eTRANSPOSITION:    // moved diagonal by 2 cells
+                column -= 2;
+                row    -= 2;
+                break;
 
-			case CorrectionType::eNOT_INITIALIZED:
-			default:
-				assert(0 && "incorrect fixType");
-				break;
-			}
-		}
+            case CorrectionType::eNOT_INITIALIZED:
+            default:
+                assert(0 && "incorrect fixType");
+                break;
+            }
+        }
 
-		return backtrace;
-	}
+        return backtrace;
+    }
 
 };
 

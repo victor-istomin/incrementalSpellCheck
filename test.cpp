@@ -184,14 +184,14 @@ void unitTests()
 
     assert(SpellCheck::getSmartDistance("abcde", std::string("xbcd"), true) == 1);     // 1 correction xbcd -> abcd, then incremental match
 
-	assert(SpellCheck::getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
-	assert(SpellCheck::getSmartDistance("abcde", "bac", true) == 1);     // bac -> abc, then incremental
+    assert(SpellCheck::getSmartDistance("abcde", "xabc", true) == 1);    // xabc -> abc, then incremental
+    assert(SpellCheck::getSmartDistance("abcde", "bac", true) == 1);     // bac -> abc, then incremental
 
-	assert(SpellCheck::getSmartDistance("abcdefgh", "abdc", true) == 1); // transposition at end of string, then incremental match
+    assert(SpellCheck::getSmartDistance("abcdefgh", "abdc", true) == 1); // transposition at end of string, then incremental match
 
     assert(SpellCheck::getSmartDistance("abcde", "xbcd", true) == 1);     // 1 correction xbcd -> abcd, then incremental match
 
-	assert(SpellCheck::getSmartDistance("1234567890qwertyuiopasdfghjklzxcvbnm", "____1234567890zxcvbnm____", true) == 27);  // long strings
+    assert(SpellCheck::getSmartDistance("1234567890qwertyuiopasdfghjklzxcvbnm", "____1234567890zxcvbnm____", true) == 27);  // long strings
 
     const char* rawArray[] = { "one two", "Three" };
     SpellCheck fromRawArray { rawArray };
