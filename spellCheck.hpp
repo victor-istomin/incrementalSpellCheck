@@ -1,12 +1,11 @@
 #pragma once
 #include <algorithm>
-#include <iterator>
 #include <numeric>
 #include <string>
+#include <cstring>
 #include <list>
 #include <array>
-#include <cstring>
-#include <limits>
+#include <vector>
 #include <cassert>
 
 #ifdef max
@@ -55,7 +54,7 @@ public:
 
     typedef std::list<Correction> Corrections;
 
-    // Get a list if correction suggestions. In case of 'isIncremental', don't count insertions past the end if 'initialWord', 
+    // Get a list of correction suggestions. In case of 'isIncremental', don't count insertions past the end if 'initialWord', 
     // assume that user will type insufficient chars later
     template <typename String>
     Corrections getCorrections(const String& initialWord, unsigned maxCorrections, bool isIncremental = false) const

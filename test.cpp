@@ -73,7 +73,7 @@ IncrementalSearch load()
             wikipedia.emplace_back(std::move(line));
     }
 
-    return std::move(IncrementalSearch { wikipedia });
+    return IncrementalSearch { wikipedia };
 }
 
 #undef max
