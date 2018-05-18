@@ -35,13 +35,19 @@ void dump(Item* buffer, size_t width, size_t height)
 class SpellCheck
 {
 public:
+    struct NoCaseConversion
+    {
+        char operator()(char c) const { return c; }
+    };
+
     // with vocabulary
-    template <typename StringsArray, typename CaseConvertor = decltype(&tolower)>
-    explicit SpellCheck(const StringsArray& text, CaseConvertor changeCase = &tolower)
+    template <typename StringsArray, typename CaseConvertor = NoCaseConversion>
+    explicit SpellCheck(const StringsArray& text, CaseConvertor changeCase = NoCaseConversion())
     {
         for (const auto& sentence : text)
             tokenize(sentence, m_tokens, changeCase);
 
+        // remove duplicates
         std::sort(m_tokens.begin(), m_tokens.end());
         m_tokens.erase(std::unique(m_tokens.begin(), m_tokens.end()), m_tokens.end());
     }
@@ -104,12 +110,10 @@ public:
         return distance;
     }
 
-    typedef std::vector<std::string> Strings;
-
-    template <typename String, typename StringsList, typename CaseConvertor = decltype(&tolower)>
-    static void tokenize(const String& input, StringsList& insertInto,  CaseConvertor changeCase = &tolower)
+    template <typename String, typename StringList, typename CaseConvertor = NoCaseConversion>
+    static void tokenize(const String& input, StringList& insertInto,  CaseConvertor changeCase = NoCaseConversion())
     {
-        using Token = typename StringsList::value_type;
+        using Token = typename StringList::value_type;
         std::string nextToken;
         nextToken.reserve(getSize(input));
 
@@ -143,9 +147,11 @@ private:
         TRANSPOSITION = 1,
     };
 
+    std::vector<std::string> m_tokens;
 
-    Strings m_tokens;
-
+    // this is simple BUffer implementation. Actually, it's either std::array or std::vector
+    // std::array is user in order to speed up computation by avoiding extra heap allocations
+    // while std::vector is a fallback in case of large buffer needed
     template <typename T>
     class Buffer
     {
@@ -201,7 +207,8 @@ private:
         {
             if(other.isStatic())
             {
-                size_t itemsToMove = std::max((isStatic() ? m_size : 0), other.m_size);
+                size_t mineItems = isStatic() ? m_size : 0;
+                size_t itemsToMove = std::max(mineItems, other.m_size);
 
                 for(size_t i = 0; i < itemsToMove; ++i)
                     std::swap(m_static[i], other.m_static[i]);
@@ -216,11 +223,12 @@ private:
 
             m_size = other.m_size;
 
-            other.m_actual = nullptr; // don't care about swapping current static/dynamic data into 'other'
+            // don't care about these members in temporary 'other'
+            other.m_actual = nullptr;
             other.m_size = 0;
+
             return *this;
         }
-
 
         void reset(size_t newSize) { *this = Buffer(newSize); }
 
@@ -241,11 +249,10 @@ private:
         eTRANSPOSITION = 't'
     };
 
-
     struct Alternative
     {
         CorrectionType bestType = CorrectionType::eNOT_INITIALIZED;
-        int bestDistance = std::numeric_limits<int>::max();
+        int bestDistance        = std::numeric_limits<int>::max();
 
         Alternative() = default;
 
@@ -317,8 +324,7 @@ private:
                         correction.propose(CorrectionType::eTRANSPOSITION, distanceMatrix[((i - 2) * width) + (j - 2)] + TRANSPOSITION);
                     }
 
-                    // BUG: insertion should be proposed before substitution, because both will resolve insufficient character after the end of 'source'
-                    // TODO: correct length difference handling
+                    // insertion should be proposed before substitution, because both will resolve insufficient character after the end of 'source'
 
                     correction.propose(CorrectionType::eINSERTION,    distanceMatrix[thisRow + (j - 1)] + INSERTION);
                     correction.propose(CorrectionType::eSUBSTITUTION, distanceMatrix[prevRow + (j - 1)] + SUBSTITUTION);
@@ -340,6 +346,8 @@ private:
         dump((char*) &correctionsMatrix[0], width, height);
 #endif
 
+        // in case of incremental match, we need both 'distance' and a list of corrections
+        // backtrace will construct corrections list from 'distanceMatrix'
         if(backtrace != nullptr)
         {
             *backtrace = optimalStringAlignmentBacktrace(height, width, correctionsMatrix);

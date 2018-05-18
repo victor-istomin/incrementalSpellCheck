@@ -14,7 +14,7 @@ public:
 
     template <typename StringsArray>
     explicit IncrementalSearch(const StringsArray& text)
-        : m_spellCheck(text)
+        : m_spellCheck(text, &tolower)
     {
         m_text.reserve(std::size(text));
 
@@ -43,8 +43,8 @@ public:
 
         auto     corrections  = getCorrections(substring);
         unsigned minMisprints = corrections.empty() ? 0 : corrections.front().m_distance;
-        auto worstCorrections = std::find_if(corrections.begin(), corrections.end(), [minMisprints](const SpellCheck::Correction& c) { return c.m_distance > minMisprints; });
-        corrections.resize(std::distance(corrections.begin(), worstCorrections));
+        auto firstBad = std::find_if(corrections.begin(), corrections.end(), [minMisprints](const SpellCheck::Correction& c) { return c.m_distance > minMisprints; });
+        corrections.resize(std::distance(corrections.begin(), firstBad));
 
         for (size_t i = 0; i < m_textLowercase.size() && resultsStart.size() < maxCount; ++i)
         {
