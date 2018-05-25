@@ -1,6 +1,6 @@
 CXX=g++
 
-CXXFLAGS=--std=c++17 -Wall $(USER_DEFINES)
+CXXFLAGS=-std=c++17 -Wall $(USER_DEFINES)
 CXXFLAGS_Release=$(CXXFLAGS) -Ofast -march=native
 CXXFLAGS_Debug=$(CXXFLAGS) -ggdb -g3
 
