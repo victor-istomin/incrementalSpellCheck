@@ -139,6 +139,7 @@ void interactive()
 
 void unitTests()
 {
+    assert(SpellCheck::getSmartDistance("go to home", "goto", true) == 1);
     IncrementalSearch search = load();
 
     // insertion

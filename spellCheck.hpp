@@ -13,21 +13,46 @@
 #define HAD_MAX_DEFINE
 #endif
 
+#define DUMP
 #if defined DUMP
 #include <iostream>
 #include <iomanip>
 
+template <typename Int>
+Int getItem(Int i)   { return i; }
+
+template <>
+char getItem(char c) { return c != '\0' ? c : '-'; }
+
 template <typename Item>
-void dump(Item* buffer, size_t width, size_t height)
+void dump(Item* buffer, size_t width, size_t height, const char* rowLabels = nullptr, const char* columnLabels = nullptr)
 {
+	if(columnLabels)
+	{
+		std::cout << "    ";
+
+        for(size_t i = 0; i < width; ++i)
+			std::cout << std::setw(4) << (i > 0 ? columnLabels[i - 1] : ' ');
+
+		std::cout << std::endl;
+	}
+
     for(size_t row = 0; row < height; ++row)
     {
-        for(size_t column = 0; column < width; ++column)
-            std::cout << std::setw(4) << buffer[row * width + column];
+		if(rowLabels)
+			std::cout << std::setw(4) << (row > 0 ? rowLabels[row - 1] : ' ');
+		else
+			std::cout << "    ";
+
+		for(size_t column = 0; column < width; ++column)
+        {
+            std::cout << std::setw(4) << getItem(buffer[row * width + column]);
+        }
 
         std::cout << std::endl;
     }
 }
+
 
 #endif
 
@@ -101,7 +126,7 @@ public:
         {
             // ignore insertions past the end of word, assume user will type them later.
             int insertionsPastEnd = 0;
-            for(auto it = traceback.rbegin(); it != traceback.rend() && *it == CorrectionType::eINSERTION; ++it)
+            for(auto it = traceback.begin(); it != traceback.end() && *it == CorrectionType::eINSERTION; ++it)
                 ++insertionsPastEnd;
 
             distance -= insertionsPastEnd;
@@ -149,13 +174,13 @@ private:
 
     std::vector<std::string> m_tokens;
 
-    // this is simple BUffer implementation. Actually, it's either std::array or std::vector
+    // this is simple Buffer implementation. Actually, it's either std::array or std::vector
     // std::array is user in order to speed up computation by avoiding extra heap allocations
     // while std::vector is a fallback in case of large buffer needed
     template <typename T>
     class Buffer
     {
-        static const size_t STATIC_SIZE = 16 * 16;
+		static const size_t STATIC_SIZE = 16 * 16;
 
         std::array<T, STATIC_SIZE> m_static;
         std::vector<T>             m_dynamic;
@@ -166,23 +191,6 @@ private:
         Buffer& operator=(const Buffer&) = delete;
 
         bool isStatic() const { return m_actual == m_static.data(); }
-
-        class ReverseIterator : std::forward_iterator_tag
-        {
-            T* m_ptr;
-
-        public:
-            ReverseIterator(T* ptr) : m_ptr(ptr) {}
-
-            T& operator*()  { return *m_ptr; }
-            T* operator->() { return m_ptr; }
-
-            ReverseIterator operator++()    { return ReverseIterator{ --m_ptr }; }
-            ReverseIterator operator++(int) { ReverseIterator old{ m_ptr }; ++(*this); return old; }
-
-            bool operator==(const ReverseIterator& other) const { return m_ptr == other.m_ptr; }
-            bool operator!=(const ReverseIterator& other) const { return !(*this == other); }
-        };
 
     public:
         explicit Buffer(size_t size = 0)
@@ -207,8 +215,7 @@ private:
         {
             if(other.isStatic())
             {
-                size_t mineItems = isStatic() ? m_size : 0;
-                size_t itemsToMove = std::max(mineItems, other.m_size);
+                size_t itemsToMove = other.m_size;
 
                 for(size_t i = 0; i < itemsToMove; ++i)
                     std::swap(m_static[i], other.m_static[i]);
@@ -230,13 +237,20 @@ private:
             return *this;
         }
 
-        void reset(size_t newSize) { *this = Buffer(newSize); }
-
         T&       operator[](size_t index)       { return m_actual[index]; }
         const T& operator[](size_t index) const { return m_actual[index]; }
 
-        ReverseIterator rbegin() const { return ReverseIterator{ m_actual + m_size - 1 }; }
-        ReverseIterator rend() const   { return ReverseIterator{ m_actual - 1 }; }
+		T* begin() { return m_actual; }
+		T* end()   { return m_actual + m_size;  }
+
+		void shrink(size_t actualSize)
+		{
+			assert(actualSize <= m_size);
+			if(actualSize <= m_size)
+			{
+				m_size = actualSize;
+			}
+		}
     };
 
     enum class CorrectionType : char
@@ -340,10 +354,10 @@ private:
 
 #if defined DUMP
         std::cout << "Costs:\n";
-        dump(&distanceMatrix[0], width, height);
+        dump(&distanceMatrix[0], width, height, &target[0], &source[0]);
 
         std::cout << "Operations:\n";
-        dump((char*) &correctionsMatrix[0], width, height);
+        dump((char*) &correctionsMatrix[0], width, height, &target[0], &source[0]);
 #endif
 
         // in case of incremental match, we need both 'distance' and a list of corrections
@@ -351,6 +365,15 @@ private:
         if(backtrace != nullptr)
         {
             *backtrace = optimalStringAlignmentBacktrace(height, width, correctionsMatrix);
+
+#if defined DUMP
+            std::string s;
+            std::transform(backtrace->begin(), backtrace->end(), std::back_inserter(s), [](CorrectionType c) {return (char)c;});
+			std::reverse(s.begin(), s.end());
+			std::cout << "Source:              " << source << std::endl
+			          << "Target:              " << target << std::endl
+			          << "Optimal corrections: " << s      << std::endl;
+#endif
         }
 
         return distance;
@@ -364,15 +387,13 @@ private:
         int row    = height - 1;
         int column = width - 1;
 
-        auto itPrevious = backtrace.rbegin();
+        auto itActualEnd = backtrace.begin();
 
         while(row != 0 || column != 0)
         {
             CorrectionType fixType = correctionsMatrix[column + row * width];
 
-            assert(itPrevious != backtrace.rend());
-            *itPrevious = fixType;
-            ++itPrevious;
+            assert(itActualEnd != backtrace.end());
 
             switch(fixType)
             {
@@ -400,8 +421,13 @@ private:
                 assert(0 && "incorrect fixType");
                 break;
             }
+
+			*itActualEnd = fixType;
+			++itActualEnd;
+
         }
 
+		backtrace.shrink(itActualEnd - backtrace.begin());
         return backtrace;
     }
 
