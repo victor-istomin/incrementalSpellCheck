@@ -27,24 +27,24 @@ char getItem(char c) { return c != '\0' ? c : '-'; }
 template <typename Item>
 void dump(Item* buffer, size_t width, size_t height, const char* rowLabels = nullptr, const char* columnLabels = nullptr)
 {
-	if(columnLabels)
-	{
-		std::cout << "    ";
+    if(columnLabels)
+    {
+        std::cout << "    ";
 
         for(size_t i = 0; i < width; ++i)
-			std::cout << std::setw(4) << (i > 0 ? columnLabels[i - 1] : ' ');
+            std::cout << std::setw(4) << (i > 0 ? columnLabels[i - 1] : ' ');
 
-		std::cout << std::endl;
-	}
+        std::cout << std::endl;
+    }
 
     for(size_t row = 0; row < height; ++row)
     {
-		if(rowLabels)
-			std::cout << std::setw(4) << (row > 0 ? rowLabels[row - 1] : ' ');
-		else
-			std::cout << "    ";
+        if(rowLabels)
+            std::cout << std::setw(4) << (row > 0 ? rowLabels[row - 1] : ' ');
+        else
+            std::cout << "    ";
 
-		for(size_t column = 0; column < width; ++column)
+        for(size_t column = 0; column < width; ++column)
         {
             std::cout << std::setw(4) << getItem(buffer[row * width + column]);
         }
@@ -180,7 +180,7 @@ private:
     template <typename T>
     class Buffer
     {
-		static const size_t STATIC_SIZE = 16 * 16;
+        static const size_t STATIC_SIZE = 16 * 16;
 
         std::array<T, STATIC_SIZE> m_static;
         std::vector<T>             m_dynamic;
@@ -240,17 +240,17 @@ private:
         T&       operator[](size_t index)       { return m_actual[index]; }
         const T& operator[](size_t index) const { return m_actual[index]; }
 
-		T* begin() { return m_actual; }
-		T* end()   { return m_actual + m_size;  }
+        T* begin() { return m_actual; }
+        T* end()   { return m_actual + m_size;  }
 
-		void shrink(size_t actualSize)
-		{
-			assert(actualSize <= m_size);
-			if(actualSize <= m_size)
-			{
-				m_size = actualSize;
-			}
-		}
+        void shrink(size_t actualSize)
+        {
+            assert(actualSize <= m_size);
+            if(actualSize <= m_size)
+            {
+                m_size = actualSize;
+            }
+        }
     };
 
     enum class CorrectionType : char
@@ -369,10 +369,10 @@ private:
 #if defined DUMP
             std::string s;
             std::transform(backtrace->begin(), backtrace->end(), std::back_inserter(s), [](CorrectionType c) {return (char)c;});
-			std::reverse(s.begin(), s.end());
-			std::cout << "Source:              " << source << std::endl
-			          << "Target:              " << target << std::endl
-			          << "Optimal corrections: " << s      << std::endl;
+            std::reverse(s.begin(), s.end());
+            std::cout << "Source:              " << source << std::endl
+                      << "Target:              " << target << std::endl
+                      << "Optimal corrections: " << s      << std::endl;
 #endif
         }
 
@@ -422,12 +422,12 @@ private:
                 break;
             }
 
-			*itActualEnd = fixType;
-			++itActualEnd;
+            *itActualEnd = fixType;
+            ++itActualEnd;
 
         }
 
-		backtrace.shrink(itActualEnd - backtrace.begin());
+        backtrace.shrink(itActualEnd - backtrace.begin());
         return backtrace;
     }
 
