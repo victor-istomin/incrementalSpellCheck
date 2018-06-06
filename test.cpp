@@ -139,8 +139,19 @@ void interactive()
 
 void unitTests()
 {
-    assert(SpellCheck::getSmartDistance("go to home", "goto", true) == 1);
+    auto incrementalLimited = [](std::string correct, const std::string& initial, int maxDist)
+    {
+        int truncateAt = std::min(initial.size() + maxDist, correct.size());
+        correct.resize(truncateAt);
+
+        return SpellCheck::getSmartDistance(correct, initial, true);
+    };
+
+    //assert(SpellCheck::getSmartDistance("go to home", "goto", true) == 1);
+    assert(incrementalLimited ("go to home", "goto", 2) == 1);
     IncrementalSearch search = load();
+
+    assert(0 && "TODO: port that ^^ to SpellCheck");
 
     // insertion
     assert(SpellCheck::getSmartDistance("abc", "abc") == 0);
